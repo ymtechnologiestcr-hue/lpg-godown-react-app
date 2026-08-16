@@ -27,7 +27,6 @@ export const uploadEmptyLoadInvoice = async (localUri: string): Promise<string> 
     '/upload/supporting-document',
     formData,
     {
-      headers: { 'Content-Type': 'multipart/form-data' },
       transformRequest: (data) => data,
     }
   );

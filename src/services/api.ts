@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "axios";
-
 import { showToast } from "../components/common/ToastManager";
+import { AUTH_TOKEN_KEY } from "../constants/auth";
 import { DATE_RANGE_STORAGE_KEY } from "../context/DateRangeContext";
 
 // Production builds set EXPO_PUBLIC_API_BASE_URL (must include the /api suffix,
@@ -21,8 +21,24 @@ const api = create({
 });
 
 api.interceptors.request.use(async (config) => {
-  const method = String(config.method || "get").toLowerCase();
   const url = String(config.url || "");
+  let token: string | null = null;
+
+  try {
+    token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+  } catch (error) {
+    console.error("Error retrieving token:", error);
+  }
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else if (!url.includes('/auth/')) {
+    // If there is no token and this is not an authentication route, 
+    // cancel the request before it even fires to avoid useless 401s after logout.
+    throw new Error("No auth token available. Request cancelled.");
+  }
+
+  const method = String(config.method || "get").toLowerCase();
 
   if (
     method !== "get" ||
@@ -82,11 +98,14 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response?.data?.message) {
+    // Don't show global error toast for 401 (Unauthorized) errors, 
+    // especially during logout to avoid annoying popups when token is cleared.
+    // 401s are usually handled by redirecting to login, or local catch blocks.
+    if (error.response?.status !== 401 && error.response?.data?.message) {
       showToast(error.response.data.message, "error");
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;

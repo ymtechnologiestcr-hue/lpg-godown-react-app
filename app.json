@@ -3,6 +3,7 @@
     "name": "LPGGodownApp",
     "slug": "LPGGodownApp",
     "version": "1.0.0",
+    "owner": "Ymtech",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "lpggodownapp",
@@ -75,7 +76,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "d8ba9c62-ad56-4504-915d-7691fcc3852f"
+        "projectId": "40a38802-b922-44bf-8beb-5bf99d358f5a"
       }
     }
   }

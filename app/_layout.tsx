@@ -1,13 +1,18 @@
-import { Redirect, Stack, useSegments } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Redirect, Stack, useSegments } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-import { AppRole } from '../src/constants/appRole';
-import { AUTH_TOKEN_KEY, AUTH_USER_KEY, getHomeRouteByRole, isSupportedMobileRole } from '../src/constants/auth';
-import { DateRangeProvider } from '../src/context/DateRangeContext';
-import ToastManager from '../src/components/common/ToastManager';
+import ToastManager from "../src/components/common/ToastManager";
+import { AppRole } from "../src/constants/appRole";
+import {
+  AUTH_TOKEN_KEY,
+  AUTH_USER_KEY,
+  getHomeRouteByRole,
+  isSupportedMobileRole,
+} from "../src/constants/auth";
+import { DateRangeProvider } from "../src/context/DateRangeContext";
 
 type SessionUser = {
   role: AppRole;
@@ -53,13 +58,15 @@ export default function RootLayout() {
     bootstrap();
   }, []);
 
-  const inLogin = segments[0] === 'login';
-  const inWelcome = segments[0] === 'welcome';
+  const inLogin = segments[0] === "login";
+  const inWelcome = segments[0] === "welcome";
 
   if (loading) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator />
         </View>
       </SafeAreaProvider>

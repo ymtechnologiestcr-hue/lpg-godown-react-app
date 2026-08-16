@@ -543,12 +543,17 @@ export default function DeliveriesScreen() {
   useEffect(() => {
     if (!selectedBatch) return;
 
+    if (salePaymentMethod === "ONLINE") {
+      setSaleAmount("0");
+      return;
+    }
+
     const unitPrice = Number(selectedBatch.productPrice || 0);
     const orderedQty = selectedBatch.productType === "COMMERCIAL" ? saleQty : 1;
     setSaleAmount(String(unitPrice * orderedQty));
-  }, [selectedBatch, saleQty]);
+  }, [selectedBatch, saleQty, salePaymentMethod]);
 
-  const handleCreateSaleFromCustomer = async () => {
+  const handleCreateSaleFromCustomer = async (skipOtp = false) => {
     if (!foundCustomer) return;
 
     if (!selectedBatch) {
@@ -556,7 +561,7 @@ export default function DeliveriesScreen() {
       return;
     }
 
-    if (otp.length !== 6) {
+    if (skipOtp !== true && otp.length !== 6) {
       Alert.alert("Required", "Please enter 6 digit OTP");
       return;
     }
@@ -593,6 +598,7 @@ export default function DeliveriesScreen() {
 
       await api.post("/drivers/sales", {
         driver_id: driverId,
+        customer_id: foundCustomer.id,
         customer_name: foundCustomer.name,
         phone: foundCustomer.phone,
         address: foundCustomer.address,
@@ -913,6 +919,7 @@ export default function DeliveriesScreen() {
                   >
                     <DeliveryCard
                       name={item.customerName}
+                      consumerNumber={item.consumerNumber}
                       address={item.address}
                       type={item.product}
                       qty={item.quantity}
@@ -1038,7 +1045,8 @@ export default function DeliveriesScreen() {
           )
         }
         onOtpChange={setOtp}
-        onSubmit={handleCreateSaleFromCustomer}
+        onSubmit={() => handleCreateSaleFromCustomer(false)}
+        onSkip={() => handleCreateSaleFromCustomer(true)}
       />
     </View>
   );
@@ -1775,6 +1783,7 @@ function ConfirmNewSaleModal({
   onSaleQtyPlus,
   onOtpChange,
   onSubmit,
+  onSkip,
 }: {
   visible: boolean;
   customer: FoundCustomer | null;
@@ -1794,6 +1803,7 @@ function ConfirmNewSaleModal({
   onSaleQtyPlus: () => void;
   onOtpChange: (value: string) => void;
   onSubmit: () => void;
+  onSkip: () => void;
 }) {
   const orderedQty = batch?.productType === "COMMERCIAL" ? saleQty : 1;
   const isDomesticBatch = batch?.productType !== "COMMERCIAL";
@@ -2015,32 +2025,43 @@ function ConfirmNewSaleModal({
                 onChangeText={onOtpChange}
               />
 
-              <TouchableOpacity
-                style={[
-                  styles.verifyButton,
-                  (otp.length !== 6 || !batch || loading || emptyMismatch) &&
-                    styles.verifyButtonDisabled,
-                ]}
-                disabled={
-                  otp.length !== 6 || !batch || loading || emptyMismatch
-                }
-                onPress={onSubmit}
-              >
-                {loading ? (
-                  <ActivityIndicator color={DS.white} />
-                ) : (
-                  <>
-                    <Ionicons
-                      name="checkmark-circle-outline"
-                      size={26}
-                      color={DS.white}
-                    />
-                    <Text style={styles.verifyButtonText}>
-                      Verify OTP & Save
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.skipAndSaveButton,
+                    loading && styles.verifyButtonDisabled,
+                  ]}
+                  disabled={loading}
+                  onPress={onSkip}
+                >
+                  <Text style={styles.skipAndSaveText}>Skip & Save</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.verifyButtonHalf,
+                    (otp.length !== 6 || !batch || loading || emptyMismatch) &&
+                      styles.verifyButtonDisabled,
+                  ]}
+                  disabled={
+                    otp.length !== 6 || !batch || loading || emptyMismatch
+                  }
+                  onPress={onSubmit}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={DS.white} />
+                  ) : (
+                    <>
+                      <Ionicons
+                        name="checkmark-circle-outline"
+                        size={20}
+                        color={DS.white}
+                      />
+                      <Text style={styles.verifyButtonText}>Verify</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </TouchableWithoutFeedback>
@@ -2577,7 +2598,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   confirmSaleScrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 100,
   },
   customerPreviewBox: {
     backgroundColor: DS.surface,
@@ -2718,6 +2739,36 @@ const styles = StyleSheet.create({
   verifyButtonText: {
     ...TYPO.s1,
     color: DS.white,
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  skipAndSaveButton: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: DS.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: DS.card,
+  },
+  skipAndSaveText: {
+    ...TYPO.s1,
+    color: DS.textPrimary,
+  },
+  verifyButtonHalf: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: RADIUS.lg,
+    backgroundColor: DS.buttonGreen,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 12,
   },
   emptyCounterValueBoxError: {
     borderColor: DS.red,

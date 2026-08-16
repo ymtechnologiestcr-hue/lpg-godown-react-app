@@ -111,7 +111,15 @@ export default function GodownLoadOutDetailScreen() {
 
           <View style={styles.titleBox}>
             <Text style={styles.title}>{loadData.load}</Text>
-            <Text style={styles.date}>{loadData.date || "23 Apr 2025"}</Text>
+            <Text style={styles.date}>
+              {loadData.date
+                ? new Date(loadData.date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "N/A"}
+            </Text>
           </View>
 
           <View style={styles.totalBox}>
@@ -230,7 +238,13 @@ export default function GodownLoadOutDetailScreen() {
             </View>
 
             <Text style={styles.invoiceValue}>
-              {loadData.date || "23 Apr 2025"}
+              {loadData.date
+                ? new Date(loadData.date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "N/A"}
             </Text>
           </View>
         </View>

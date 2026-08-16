@@ -185,6 +185,14 @@ export default function DeliveredCylindersScreen() {
                     <View style={styles.cardInfoWrap}>
                       <Text style={styles.name}>{item.customerName}</Text>
 
+                      {item.consumerNumber ? (
+                        <View style={styles.consumerNumberRow}>
+                          <Text style={styles.consumerNumberText}>
+                            Consumer No: {item.consumerNumber}
+                          </Text>
+                        </View>
+                      ) : null}
+
                       <View style={styles.addressRow}>
                         <Ionicons
                           name="location-outline"
@@ -297,6 +305,14 @@ const styles = StyleSheet.create({
     ...TYPO.s2,
     color: DS.textPrimary,
     marginBottom: 6,
+  },
+  consumerNumberRow: {
+    marginBottom: 6,
+  },
+  consumerNumberText: {
+    ...TYPO.b3,
+    color: PALETTE.blue600,
+    fontWeight: "500",
   },
   addressRow: {
     flexDirection: "row",

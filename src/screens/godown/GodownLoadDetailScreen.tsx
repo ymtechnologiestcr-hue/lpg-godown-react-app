@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system/legacy';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import * as FileSystem from "expo-file-system/legacy";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,30 +13,36 @@ import {
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-import AppHeader from '../../components/common/AppHeader';
-import ScreenContainer from '../../components/common/ScreenContainer';
-import { DS, TYPO, EYEBROW, RADIUS, WEIGHT } from '../../constants/designSystem';
-import { useDateRange } from '../../context/DateRangeContext';
-import { API_SERVER_ROOT } from '../../services/api';
+import AppHeader from "../../components/common/AppHeader";
+import ScreenContainer from "../../components/common/ScreenContainer";
+import {
+  DS,
+  EYEBROW,
+  RADIUS,
+  TYPO,
+  WEIGHT,
+} from "../../constants/designSystem";
+import { useDateRange } from "../../context/DateRangeContext";
+import { API_SERVER_ROOT } from "../../services/api";
 import {
   approveStockInLoad,
   getStockInLoadDetail,
-} from '../../services/godownService';
+} from "../../services/godownService";
 
 const resolveImageUrl = (value?: string | null) => {
   if (!value) return null;
-  if (value.startsWith('http://') || value.startsWith('https://')) return value;
-  if (value.startsWith('/')) return `${API_SERVER_ROOT}${value}`;
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  if (value.startsWith("/")) return `${API_SERVER_ROOT}${value}`;
   return value;
 };
 
 const getDownloadFileName = (url: string, fallbackName: string) => {
-  const cleanUrl = url.split('?')[0];
-  const lastSegment = cleanUrl.split('/').pop();
+  const cleanUrl = url.split("?")[0];
+  const lastSegment = cleanUrl.split("/").pop();
   if (!lastSegment) return fallbackName;
-  return lastSegment.includes('.') ? lastSegment : fallbackName;
+  return lastSegment.includes(".") ? lastSegment : fallbackName;
 };
 
 export default function GodownLoadDetailScreen() {
@@ -52,7 +58,7 @@ export default function GodownLoadDetailScreen() {
       const data = await getStockInLoadDetail(id);
       setLoadData(data);
     } catch (error) {
-      console.log('Stock in detail error:', error);
+      console.log("Stock in detail error:", error);
     } finally {
       setLoading(false);
     }
@@ -67,17 +73,17 @@ export default function GodownLoadDetailScreen() {
   }, [rangeKey, fetchLoadDetail]);
 
   const handleApprove = async () => {
-    if (loadData?.status !== 'WAITING_APPROVAL') {
+    if (loadData?.status !== "WAITING_APPROVAL") {
       return;
     }
 
     try {
       setApproving(true);
       await approveStockInLoad(id);
-      DeviceEventEmitter.emit('STOCK_IN_APPROVED', Number(id));
+      DeviceEventEmitter.emit("STOCK_IN_APPROVED", Number(id));
       router.back();
     } catch (error) {
-      console.log('Approve stock in error:', error);
+      console.log("Approve stock in error:", error);
     } finally {
       setApproving(false);
     }
@@ -109,7 +115,7 @@ export default function GodownLoadDetailScreen() {
 
   const handleDownloadInvoice = async () => {
     if (!invoiceImageUrl) {
-      Alert.alert('Download unavailable', 'Invoice photo is not available.');
+      Alert.alert("Download unavailable", "Invoice photo is not available.");
       return;
     }
 
@@ -117,15 +123,15 @@ export default function GodownLoadDetailScreen() {
     const fileName = getDownloadFileName(invoiceImageUrl, fallbackName);
 
     try {
-      if (Platform.OS === 'web') {
+      if (Platform.OS === "web") {
         const response = await fetch(invoiceImageUrl);
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);
-        const anchor = document.createElement('a');
+        const anchor = document.createElement("a");
 
         anchor.href = objectUrl;
         anchor.download = fileName;
-        anchor.style.display = 'none';
+        anchor.style.display = "none";
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
@@ -134,18 +140,24 @@ export default function GodownLoadDetailScreen() {
       }
 
       // Download to app documents directory
-      const localUri = `${FileSystem.documentDirectory ?? ''}${fileName}`;
-      const downloadedFile = await FileSystem.downloadAsync(invoiceImageUrl, localUri);
+      const localUri = `${FileSystem.documentDirectory ?? ""}${fileName}`;
+      const downloadedFile = await FileSystem.downloadAsync(
+        invoiceImageUrl,
+        localUri,
+      );
 
       // Share the file so user can save it to Downloads or other locations
       await Share.share({
         url: downloadedFile.uri,
-        title: 'Invoice Photo',
-        message: 'Save invoice to Downloads',
+        title: "Invoice Photo",
+        message: "Save invoice to Downloads",
       });
     } catch (error) {
-      console.log('Invoice download error:', error);
-      Alert.alert('Download failed', 'Could not download the invoice photo. Please try again.');
+      console.log("Invoice download error:", error);
+      Alert.alert(
+        "Download failed",
+        "Could not download the invoice photo. Please try again.",
+      );
     }
   };
 
@@ -161,7 +173,15 @@ export default function GodownLoadDetailScreen() {
 
           <View style={styles.titleBox}>
             <Text style={styles.title}>{loadData.load}</Text>
-            <Text style={styles.date}>23 Apr 2025</Text>
+            <Text style={styles.date}>
+              {loadData.date
+                ? new Date(loadData.date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "N/A"}
+            </Text>
           </View>
 
           <View style={styles.totalBox}>
@@ -171,8 +191,16 @@ export default function GodownLoadDetailScreen() {
         </View>
 
         <View style={styles.infoCard}>
-          <InfoRow icon="car-outline" label="VEHICLE" value={loadData.vehicle} />
-          <InfoRow icon="person-outline" label="DRIVER" value={loadData.driver} />
+          <InfoRow
+            icon="car-outline"
+            label="VEHICLE"
+            value={loadData.vehicle}
+          />
+          <InfoRow
+            icon="person-outline"
+            label="DRIVER"
+            value={loadData.driver}
+          />
           <InfoRow icon="cube-outline" label="DEPOT" value={loadData.depot} />
         </View>
 
@@ -205,7 +233,11 @@ export default function GodownLoadDetailScreen() {
         <View style={styles.invoiceCard}>
           <View style={styles.invoiceRow}>
             <View style={styles.invoiceLeft}>
-              <Ionicons name="document-text-outline" size={16} color={DS.textSecondary} />
+              <Ionicons
+                name="document-text-outline"
+                size={16}
+                color={DS.textSecondary}
+              />
               <Text style={styles.invoiceLabel}>Invoice No.</Text>
             </View>
             <Text style={styles.invoiceValue}>{loadData.invoice}</Text>
@@ -213,10 +245,22 @@ export default function GodownLoadDetailScreen() {
 
           <View style={styles.invoiceRow}>
             <View style={styles.invoiceLeft}>
-              <Ionicons name="calendar-outline" size={16} color={DS.textSecondary} />
+              <Ionicons
+                name="calendar-outline"
+                size={16}
+                color={DS.textSecondary}
+              />
               <Text style={styles.invoiceLabel}>Invoice Date</Text>
             </View>
-            <Text style={styles.invoiceValue}>23 Apr 2025</Text>
+            <Text style={styles.invoiceValue}>
+              {loadData.date
+                ? new Date(loadData.date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "N/A"}
+            </Text>
           </View>
         </View>
 
@@ -224,21 +268,33 @@ export default function GodownLoadDetailScreen() {
           <Text style={styles.sectionTitleSmall}>INVOICE PHOTO</Text>
 
           <TouchableOpacity
-            style={[styles.downloadPill, !invoiceImageUrl && styles.downloadPillDisabled]}
+            style={[
+              styles.downloadPill,
+              !invoiceImageUrl && styles.downloadPillDisabled,
+            ]}
             onPress={handleDownloadInvoice}
             disabled={!invoiceImageUrl}
           >
-            <Ionicons name="download-outline" size={14} color={DS.textPrimary} />
+            <Ionicons
+              name="download-outline"
+              size={14}
+              color={DS.textPrimary}
+            />
             <Text style={styles.downloadText}>DOWNLOAD</Text>
           </TouchableOpacity>
         </View>
 
         {invoiceImageUrl ? (
-          <Image source={{ uri: invoiceImageUrl }} style={styles.invoiceImage} />
+          <Image
+            source={{ uri: invoiceImageUrl }}
+            style={styles.invoiceImage}
+          />
         ) : (
           <View style={styles.invoiceEmptyBox}>
             <Ionicons name="image-outline" size={26} color={DS.textSecondary} />
-            <Text style={styles.invoiceEmptyText}>Invoice photo not uploaded</Text>
+            <Text style={styles.invoiceEmptyText}>
+              Invoice photo not uploaded
+            </Text>
           </View>
         )}
       </View>
@@ -249,19 +305,19 @@ export default function GodownLoadDetailScreen() {
           onPress={handleApprove}
           disabled={
             approving ||
-            loadData.status === 'APPROVED' ||
-            loadData.status !== 'WAITING_APPROVAL'
+            loadData.status === "APPROVED" ||
+            loadData.status !== "WAITING_APPROVAL"
           }
         >
           <Ionicons name="checkmark" size={18} color={DS.white} />
           <Text style={styles.approveText}>
-            {loadData.status === 'APPROVED'
-              ? 'Approved'
-              : loadData.status !== 'WAITING_APPROVAL'
-              ? 'Waiting for submit'
-              : approving
-              ? 'Approving...'
-              : `Approve All Stock (${loadData.qty})`}
+            {loadData.status === "APPROVED"
+              ? "Approved"
+              : loadData.status !== "WAITING_APPROVAL"
+                ? "Waiting for submit"
+                : approving
+                  ? "Approving..."
+                  : `Approve All Stock (${loadData.qty})`}
           </Text>
         </TouchableOpacity>
       </View>
@@ -296,16 +352,16 @@ function StockRow({ label, value }: any) {
 const styles = StyleSheet.create({
   loaderBox: {
     height: 400,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     padding: 16,
     paddingBottom: 130,
   },
   pageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 18,
   },
   titleBox: {
@@ -322,7 +378,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   totalBox: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   totalValue: {
     ...TYPO.h5,
@@ -343,8 +399,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 13,
   },
   infoIcon: {
@@ -352,8 +408,8 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: RADIUS.sm,
     backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   infoLabel: {
@@ -366,9 +422,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   sectionTitle: {
     ...EYEBROW,
@@ -387,13 +443,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     borderRadius: RADIUS.md,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginTop: 8,
   },
   tableHead: {
     backgroundColor: DS.surface,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -408,9 +464,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: DS.divider,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   stockLabel: {
     ...TYPO.b4,
@@ -424,9 +480,9 @@ const styles = StyleSheet.create({
     minHeight: 52,
     backgroundColor: DS.surface,
     paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   totalRowText: {
     ...TYPO.b4,
@@ -446,13 +502,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   invoiceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   invoiceLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   invoiceLabel: {
@@ -464,13 +520,13 @@ const styles = StyleSheet.create({
     color: DS.textPrimary,
   },
   photoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   downloadPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     backgroundColor: DS.surface,
     borderRadius: RADIUS.md,
@@ -496,8 +552,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     backgroundColor: DS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
   },
   invoiceEmptyText: {
@@ -505,7 +561,7 @@ const styles = StyleSheet.create({
     color: DS.textSecondary,
   },
   bottomAction: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 72,
@@ -518,9 +574,9 @@ const styles = StyleSheet.create({
     height: 52,
     backgroundColor: DS.buttonGreen,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
     gap: 8,
   },
   approveText: {

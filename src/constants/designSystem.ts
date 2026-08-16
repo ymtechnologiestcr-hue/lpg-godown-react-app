@@ -135,6 +135,7 @@ export const WEIGHT = {
   regular: '400' as TextStyle['fontWeight'],
   medium: '500' as TextStyle['fontWeight'],
   semibold: '600' as TextStyle['fontWeight'],
+  bold: '700' as TextStyle['fontWeight'],
 };
 
 const t = (

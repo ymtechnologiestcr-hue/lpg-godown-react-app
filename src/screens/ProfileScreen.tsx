@@ -420,6 +420,17 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
 
                   <View style={styles.profileMetaRow}>
                     <Ionicons
+                      name="briefcase-outline"
+                      size={18}
+                      color={DS.textSecondary}
+                    />
+                    <Text style={styles.profileMeta}>
+                      Delivery Driver
+                    </Text>
+                  </View>
+
+                  <View style={styles.profileMetaRow}>
+                    <Ionicons
                       name="call-outline"
                       size={18}
                       color={DS.textSecondary}

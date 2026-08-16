@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -12,9 +14,9 @@ import {
   View,
 } from "react-native";
 
-import AppHeader from "../components/common/AppHeader";
 import ScreenContainer from "../components/common/ScreenContainer";
-import CashDenominationModal from "../components/ui/CashDenominationModal";
+import SettleAmountModal from "../components/ui/SettleAmountModal";
+import UpiPaymentModal from "../components/ui/UpiPaymentModal";
 import { AUTH_USER_KEY } from "../constants/auth";
 import { DS, PALETTE, RADIUS, TYPO, WEIGHT } from "../constants/designSystem";
 import { useDateRange } from "../context/DateRangeContext";
@@ -27,13 +29,18 @@ type CollectionCardData = {
   count: number;
   status: CollectionStatus;
   transactions: any[];
+  displayMessage?: string;
 };
 
 type CollectionSummaryResponse = {
   summary: {
     cashCollected: number;
     upiCollected: number;
+    onlineCollected?: number;
+    creditCollected?: number;
     totalCollected: number;
+    totalDeliveries: number;
+    totalSettled?: number;
   };
   settlements: {
     cashAssigned: CollectionCardData;
@@ -209,8 +216,9 @@ function CollectionActionCard({
 }
 
 export default function CollectionScreen() {
-  const { rangeKey } = useDateRange();
+  const { range, rangeKey } = useDateRange();
   const [driverId, setDriverId] = useState<number | null>(null);
+  const [driverName, setDriverName] = useState("");
 
   const [activeTab, setActiveTab] = useState<"summary" | "history">("summary");
 
@@ -226,12 +234,12 @@ export default function CollectionScreen() {
   const [error, setError] = useState("");
   const [historyPage, setHistoryPage] = useState(1);
 
+  const [settleModalVisible, setSettleModalVisible] = useState(false);
   const [settlingMethod, setSettlingMethod] = useState<
-    "UPI" | "TOTAL_UPI" | null
+    "UPI" | "TOTAL_UPI" | "CASH" | "ONLINE" | null
   >(null);
-
-  const [cashModalVisible, setCashModalVisible] = useState(false);
-  const [cashSubmitting, setCashSubmitting] = useState(false);
+  const [upiModalVisible, setUpiModalVisible] = useState(false);
+  const [pendingUpiAmount, setPendingUpiAmount] = useState(0);
 
   useEffect(() => {
     const loadDriverId = async () => {
@@ -241,6 +249,9 @@ export default function CollectionScreen() {
         const id = Number(parsed?.id);
 
         setDriverId(id && !Number.isNaN(id) ? id : null);
+        if (parsed?.name) {
+          setDriverName(parsed.name);
+        }
       } catch {
         setDriverId(null);
       }
@@ -249,26 +260,42 @@ export default function CollectionScreen() {
     loadDriverId();
   }, []);
 
+
+
   const fetchCollectionSummary = useCallback(async () => {
     if (!driverId) return;
 
-    const response = await api.get(`/drivers/${driverId}/collection-summary`);
+    const { startDate, endDate } = range;
+    const response = await api.get(`/drivers/${driverId}/collection-summary?startDate=${startDate}&endDate=${endDate}`);
 
     if (response.data?.success) {
       setSummaryData(response.data.data);
     }
-  }, [driverId]);
+  }, [driverId, range]);
 
   const fetchCollectionHistory = useCallback(
     async (page = 1) => {
       if (!driverId) return;
 
       const response = await api.get(
-        `/drivers/${driverId}/collection-history?page=${page}&limit=2`,
+        `/drivers/${driverId}/profile-history?page=${page}&limit=4`,
       );
 
       if (response.data?.success) {
-        setHistoryData(response.data.data);
+        if (page === 1) {
+          setHistoryData(response.data.data);
+        } else {
+          setHistoryData((prev) => {
+            if (!prev) return response.data.data;
+            return {
+              ...response.data.data,
+              items: [...prev.items, ...response.data.data.items],
+            };
+          });
+        }
+        if (response.data.data?.driver?.name) {
+          setDriverName(response.data.data.driver.name);
+        }
       }
     },
     [driverId],
@@ -286,14 +313,17 @@ export default function CollectionScreen() {
       }
     } catch (err: any) {
       setError("Failed to load data");
+      Alert.alert("Error", err?.response?.data?.message || "Failed to load data");
     } finally {
       setLoading(false);
     }
   }, [activeTab, fetchCollectionSummary, fetchCollectionHistory, historyPage]);
 
-  useEffect(() => {
-    loadScreen();
-  }, [loadScreen, rangeKey]);
+  useFocusEffect(
+    useCallback(() => {
+      loadScreen();
+    }, [loadScreen, rangeKey])
+  );
 
   const onRefresh = async () => {
     try {
@@ -314,81 +344,10 @@ export default function CollectionScreen() {
     await fetchCollectionHistory(historyPage);
   };
 
-  const handleSettleUpi = async () => {
-    if (!driverId) {
-      Alert.alert("Error", "Driver session not found");
-      return;
-    }
-
-    try {
-      setSettlingMethod("UPI");
-
-      const response = await api.put(
-        `/drivers/${driverId}/settle-collections`,
-        {
-          method: "UPI",
-        },
-      );
-
-      if (response.data?.success) {
-        Alert.alert("Success", "UPI collection sent for cashier approval");
-
-        await refreshAfterSettlement();
-      }
-    } catch (err: any) {
-      Alert.alert(
-        "Error",
-        err?.response?.data?.message || "Failed to settle UPI",
-      );
-    } finally {
-      setSettlingMethod(null);
-    }
-  };
-
-  const handleSettleTotal = async () => {
-    if (!driverId) {
-      Alert.alert("Error", "Driver session not found");
-      return;
-    }
-
-    try {
-      setSettlingMethod("TOTAL_UPI");
-
-      const response = await api.put(
-        `/drivers/${driverId}/settle-collections`,
-        {
-          method: "TOTAL_UPI",
-        },
-      );
-
-      if (response.data?.success) {
-        Alert.alert("Success", "Collection sent for cashier approval");
-
-        await refreshAfterSettlement();
-      }
-    } catch (err: any) {
-      Alert.alert(
-        "Error",
-        err?.response?.data?.message || "Failed to settle total collection",
-      );
-    } finally {
-      setSettlingMethod(null);
-    }
-  };
-
-  const handleSubmitCashDenominations = async ({
-    denominations,
-    enteredAmount,
-  }: {
-    denominations: {
-      "500": number;
-      "100": number;
-      "50": number;
-      "20": number;
-      "10": number;
-      coins: number;
-    };
-    enteredAmount: number;
+  const handleSettleSubmit = async (payload: {
+    method: "CASH" | "UPI" | "ONLINE";
+    amount: number;
+    denominations?: any;
   }) => {
     if (!driverId) {
       Alert.alert("Error", "Driver session not found");
@@ -396,45 +355,82 @@ export default function CollectionScreen() {
     }
 
     try {
-      const expectedAmount =
-        summaryData?.settlements?.cashAssigned?.amount ?? 0;
-
-      const roundedExpected = Number(expectedAmount.toFixed(2));
-      const roundedEntered = Number(enteredAmount.toFixed(2));
-
-      if (roundedEntered !== roundedExpected) {
-        Alert.alert(
-          "Amount mismatch",
-          `Entered ₹${roundedEntered} should match assigned cash ₹${roundedExpected}`,
+      if (payload.method === "UPI" || payload.method === "ONLINE") {
+        setPendingUpiAmount(payload.amount);
+        setSettleModalVisible(false);
+        setUpiModalVisible(true);
+      } else {
+        setSettlingMethod("CASH");
+        const response = await api.put(
+          `/drivers/${driverId}/settle-collections`,
+          payload
         );
 
-        return;
-      }
-
-      setCashSubmitting(true);
-
-      const response = await api.put(
-        `/drivers/${driverId}/settle-collections`,
-        {
-          method: "CASH",
-          denominations,
-        },
-      );
-
-      if (response.data?.success) {
-        setCashModalVisible(false);
-
-        Alert.alert("Success", "Cash collection sent for cashier approval");
-
-        await refreshAfterSettlement();
+        if (response.data?.success) {
+          setSettleModalVisible(false);
+          Alert.alert("Success", "Collection sent for cashier approval");
+          await refreshAfterSettlement();
+        }
+        setSettlingMethod(null);
       }
     } catch (err: any) {
       Alert.alert(
         "Error",
-        err?.response?.data?.message || "Failed to settle cash",
+        err?.response?.data?.message || "Failed to settle collection"
+      );
+      setSettlingMethod(null);
+    }
+  };
+
+  const handleUpiSubmit = async (payload: {
+    method: "UPI";
+    amount: number;
+    paymentApp: string;
+  }) => {
+    if (!driverId) return;
+
+    try {
+      setSettlingMethod("UPI");
+      
+      const initiateRes = await api.post("/manual-payment/initiate", {
+        amount: payload.amount,
+        driverId,
+        method: "UPI",
+        paymentApp: payload.paymentApp,
+      });
+
+      if (!initiateRes.data?.success) {
+        Alert.alert("Error", "Failed to initiate payment");
+        setSettlingMethod(null);
+        return;
+      }
+
+      const verifyRes = await api.post("/manual-payment/verify", {
+        order_id: initiateRes.data.order_id,
+        status: "SUCCESS"
+      });
+
+      if (verifyRes.data?.success) {
+        const response = await api.put(
+          `/drivers/${driverId}/settle-collections`,
+          { method: "UPI", amount: payload.amount }
+        );
+
+        if (response.data?.success) {
+          setUpiModalVisible(false);
+          Alert.alert("Success", "Collection sent for cashier approval");
+          await refreshAfterSettlement();
+        }
+      } else {
+         Alert.alert("Error", "Failed to verify payment");
+      }
+    } catch (err: any) {
+      Alert.alert(
+        "Error",
+        err?.response?.data?.message || "Failed to settle collection via UPI"
       );
     } finally {
-      setCashSubmitting(false);
+      setSettlingMethod(null);
     }
   };
 
@@ -449,13 +445,32 @@ export default function CollectionScreen() {
   const assignedTotal =
     Number(cashAssigned?.amount || 0) + Number(upiAssigned?.amount || 0);
 
+  const currentFormattedDate = new Date().toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+
   return (
     <ScreenContainer
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <AppHeader />
+      <View style={styles.customHeader}>
+        <View style={styles.headerTitleRow}>
+          <View>
+            <Text style={styles.headerDriverName}>{driverName || "Driver"}</Text>
+            <Text style={styles.headerDate}>{currentFormattedDate}</Text>
+          </View>
+          <View style={styles.headerIcons}>
+            <Ionicons name="search-outline" size={24} color={DS.white} />
+            <Ionicons name="scan-outline" size={24} color={DS.white} style={{ marginLeft: 16 }} />
+            <Ionicons name="notifications-outline" size={24} color={DS.white} style={{ marginLeft: 16 }} />
+          </View>
+        </View>
+      </View>
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -517,145 +532,141 @@ export default function CollectionScreen() {
           />
         ) : activeTab === "summary" ? (
           <>
-            <View style={styles.summaryGrid}>
-              <View style={styles.summaryCard}>
-                <View
-                  style={[
-                    styles.summaryIconWrap,
-                    { backgroundColor: DS.greenSoft },
-                  ]}
-                >
-                  <Ionicons name="wallet-outline" size={22} color={DS.green} />
+            <View style={styles.blueBannerCard}>
+              <Text style={styles.blueBannerTitle}>TODAY&apos;S TOTAL COLLECTION</Text>
+              <Text style={styles.blueBannerAmount}>{formatAmount(summaryData?.summary?.totalCollected)}</Text>
+              <View style={styles.blueBannerStatsRow}>
+                <View style={styles.blueBannerStatCard}>
+                  <Text style={styles.blueBannerStatLabel}>Deliveries</Text>
+                  <Text style={styles.blueBannerStatValue}>{summaryData?.summary?.totalDeliveries || 0}</Text>
                 </View>
-
-                <Text style={styles.summaryAmount}>
-                  {formatAmount(summaryData?.summary?.cashCollected)}
-                </Text>
-
-                <Text style={styles.summaryLabel}>Cash Collected</Text>
-              </View>
-
-              <View style={styles.summaryCard}>
-                <View
-                  style={[
-                    styles.summaryIconWrap,
-                    { backgroundColor: DS.primarySoft },
-                  ]}
-                >
-                  <Ionicons
-                    name="phone-portrait-outline"
-                    size={22}
-                    color={DS.primary}
-                  />
+                <View style={styles.blueBannerStatCard}>
+                  <Text style={styles.blueBannerStatLabel}>Settled</Text>
+                  <Text style={styles.blueBannerStatValue}>{formatAmount(summaryData?.summary?.totalSettled || 0)}</Text>
                 </View>
-
-                <Text style={styles.summaryAmount}>
-                  {formatAmount(summaryData?.summary?.upiCollected)}
-                </Text>
-
-                <Text style={styles.summaryLabel}>UPI Payments</Text>
+                <View style={styles.blueBannerStatCard}>
+                  <Text style={styles.blueBannerStatLabel}>Balance</Text>
+                  <Text style={styles.blueBannerStatValue}>{formatAmount((summaryData?.summary?.totalCollected || 0) - (summaryData?.summary?.totalSettled || 0))}</Text>
+                </View>
               </View>
             </View>
 
-            {(cashAssigned?.amount ?? 0) > 0 && (
-              <CollectionActionCard
-                type="CASH"
-                title="Cash Collection"
-                amount={cashAssigned?.amount ?? 0}
-                count={cashAssigned?.count ?? 0}
-                status="ASSIGNED"
-                loading={cashSubmitting}
-                onPress={() => setCashModalVisible(true)}
-              />
-            )}
+            <View style={styles.summaryCardContainer}>
+              <Text style={styles.splitAmountsTitle}>Split Amounts</Text>
 
-            {(cashPending?.amount ?? 0) > 0 && (
-              <CollectionActionCard
-                type="CASH"
-                title="Cash Collection"
-                amount={cashPending?.amount ?? 0}
-                count={cashPending?.count ?? 0}
-                status="PENDING"
-                loading={false}
-                onPress={() => {}}
-              />
-            )}
-
-            {(upiAssigned?.amount ?? 0) > 0 && (
-              <CollectionActionCard
-                type="UPI"
-                title="UPI Payments"
-                amount={upiAssigned?.amount ?? 0}
-                count={upiAssigned?.count ?? 0}
-                status="ASSIGNED"
-                loading={settlingMethod === "UPI"}
-                onPress={handleSettleUpi}
-              />
-            )}
-
-            {(upiPending?.amount ?? 0) > 0 && (
-              <CollectionActionCard
-                type="UPI"
-                title="UPI Payments"
-                amount={upiPending?.amount ?? 0}
-                count={upiPending?.count ?? 0}
-                status="PENDING"
-                loading={false}
-                onPress={() => {}}
-              />
-            )}
-
-            {assignedTotal > 0 && (
-              <View style={styles.totalCard}>
-                <View style={[styles.collectionTitleRow, { marginBottom: 16 }]}>
-                  <View
-                    style={[
-                      styles.iconWrap,
-                      { backgroundColor: DS.primarySoft },
-                    ]}
-                  >
-                    <Ionicons
-                      name="card-outline"
-                      size={18}
-                      color={DS.primary}
-                    />
+              <View style={styles.splitRow}>
+                <View style={styles.splitLabelRow}>
+                  <View style={[styles.splitIconWrap, { backgroundColor: '#E1F4E5' }]}>
+                    <Ionicons name="cash-outline" size={16} color="#2E7D32" />
                   </View>
-
-                  <View>
-                    <Text style={styles.collectionTitle}>Total Collection</Text>
-
-                    <Text style={styles.collectionAmount}>
-                      {formatAmount(totalAmount)}
-                    </Text>
-                  </View>
+                  <Text style={styles.splitLabel}>Cash</Text>
                 </View>
-
-                <TouchableOpacity
-                  style={[
-                    styles.collectionButton,
-                    { backgroundColor: DS.primary },
-                  ]}
-                  onPress={handleSettleTotal}
-                  disabled={settlingMethod === "TOTAL_UPI"}
-                >
-                  {settlingMethod === "TOTAL_UPI" ? (
-                    <ActivityIndicator color={DS.white} />
-                  ) : (
-                    <>
-                      <Ionicons
-                        name="card-outline"
-                        size={16}
-                        color={DS.white}
-                      />
-
-                      <Text style={styles.collectionButtonText}>
-                        Settle Total — Online Payment
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                <Text style={styles.splitAmount}>{formatAmount(summaryData?.summary?.cashCollected)}</Text>
               </View>
-            )}
+
+              <View style={styles.splitDivider} />
+
+              <View style={styles.splitRow}>
+                <View style={styles.splitLabelRow}>
+                  <View style={[styles.splitIconWrap, { backgroundColor: '#E3F2FD' }]}>
+                    <Ionicons name="phone-portrait-outline" size={16} color="#1565C0" />
+                  </View>
+                  <Text style={styles.splitLabel}>UPI</Text>
+                </View>
+                <Text style={styles.splitAmount}>{formatAmount(summaryData?.summary?.upiCollected)}</Text>
+              </View>
+
+              <View style={styles.splitDivider} />
+
+              <View style={styles.splitRow}>
+                <View style={styles.splitLabelRow}>
+                  <View style={[styles.splitIconWrap, { backgroundColor: '#E3F2FD' }]}>
+                    <Ionicons name="card-outline" size={16} color="#1565C0" />
+                  </View>
+                  <Text style={styles.splitLabel}>Online</Text>
+                </View>
+                <Text style={styles.splitAmount}>{formatAmount(summaryData?.summary?.onlineCollected || 0)}</Text>
+              </View>
+
+              <View style={styles.splitDivider} />
+
+              <View style={styles.splitRow}>
+                <View style={styles.splitLabelRow}>
+                  <View style={[styles.splitIconWrap, { backgroundColor: '#FFF3E0' }]}>
+                    <Ionicons name="time-outline" size={16} color="#E65100" />
+                  </View>
+                  <Text style={styles.splitLabel}>Credit</Text>
+                </View>
+                <Text style={styles.splitAmount}>{formatAmount(summaryData?.summary?.creditCollected || 0)}</Text>
+              </View>
+              
+              <View style={styles.splitDivider} />
+
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalAmount}>{formatAmount(summaryData?.summary?.totalCollected)}</Text>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.ctaButton,
+                  assignedTotal === 0 && styles.ctaButtonDisabled
+                ]}
+                disabled={assignedTotal === 0}
+                onPress={() => setSettleModalVisible(true)}
+              >
+                <Text style={styles.ctaButtonText}>Settle the Amount</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.settlementRequestsContainer}>
+              <View style={styles.settlementRequestsHeader}>
+                <View>
+                  <Text style={styles.settlementRequestsTitle}>Settlement Requests</Text>
+                  <Text style={styles.settlementRequestsTotalPending}>
+                    Total Pending: {formatAmount(Number(cashPending?.amount || 0) + Number(upiPending?.amount || 0))}
+                  </Text>
+                </View>
+                <Text style={styles.settlementRequestsCount}>
+                  {Number(cashPending?.count || 0) + Number(upiPending?.count || 0)} request(s)
+                </Text>
+              </View>
+
+              {(Number(cashPending?.count || 0) + Number(upiPending?.count || 0)) === 0 ? (
+                <View style={styles.emptyRequestsWrapper}>
+                  <Text style={styles.emptyRequestsText}>No settlement requests yet</Text>
+                </View>
+              ) : (
+                <View style={styles.pendingRequestsList}>
+                  {cashPending?.transactions?.map((tx: any, index: number) => (
+                    <View key={`cash-${tx.id || index}`} style={styles.pendingRequestItem}>
+                      <View style={styles.pendingRequestInfo}>
+                        <Text style={styles.pendingRequestMethod}>Cash</Text>
+                        <Text style={styles.pendingRequestMessage}>
+                          {tx.customerName ? `Customer: ${tx.customerName}` : cashPending.displayMessage || "Pending for approval"}
+                        </Text>
+                      </View>
+                      <Text style={styles.pendingRequestAmount}>
+                        {formatAmount(tx.amount)}
+                      </Text>
+                    </View>
+                  ))}
+                  {upiPending?.transactions?.map((tx: any, index: number) => (
+                    <View key={`upi-${tx.id || index}`} style={styles.pendingRequestItem}>
+                      <View style={styles.pendingRequestInfo}>
+                        <Text style={styles.pendingRequestMethod}>UPI</Text>
+                        <Text style={styles.pendingRequestMessage}>
+                          {tx.customerName ? `Customer: ${tx.customerName}` : upiPending.displayMessage || "Pending for approval"}
+                        </Text>
+                      </View>
+                      <Text style={styles.pendingRequestAmount}>
+                        {formatAmount(tx.amount)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
           </>
         ) : (
           <>
@@ -679,33 +690,7 @@ export default function CollectionScreen() {
                   </Text>
                 </View>
 
-                <View style={styles.summaryStatusRow}>
-                  {group.summary.cash.amount > 0 && (
-                    <View style={styles.historyStatusCard}>
-                      <Text style={styles.historyStatusTitle}>
-                        Cash: {formatAmount(group.summary.cash.amount)}
-                      </Text>
-
-                      <Text style={styles.historyStatusText}>
-                        Settled at {formatTime(group.summary.cash.settledAt)}
-                      </Text>
-                    </View>
-                  )}
-
-                  {group.summary.upi.amount > 0 && (
-                    <View style={styles.historyStatusCard}>
-                      <Text style={styles.historyStatusTitle}>
-                        UPI: {formatAmount(group.summary.upi.amount)}
-                      </Text>
-
-                      <Text style={styles.historyStatusText}>
-                        Settled at {formatTime(group.summary.upi.settledAt)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {group.transactions.map((item, transactionIndex) => (
+                {group.transactions?.map((item: any, transactionIndex: number) => (
                   <View
                     key={transactionIndex}
                     style={styles.historyTransaction}
@@ -740,14 +725,13 @@ export default function CollectionScreen() {
                       </Text>
 
                       <Text style={styles.customerMeta}>
-                        {formatTime(item.deliveredAt)} ·{" "}
-                        {getPaymentLabel(item.paymentMode)}
+                        Qty: {item.quantity} · {getPaymentLabel(item.paymentMode)}
                       </Text>
                     </View>
 
                     <View style={{ alignItems: "flex-end" }}>
                       <Text style={styles.transactionAmount}>
-                        {formatAmount(item.amount)}
+                        {formatAmount(item.totalAmount)}
                       </Text>
 
                       <View style={styles.paidPill}>
@@ -758,22 +742,187 @@ export default function CollectionScreen() {
                 ))}
               </View>
             ))}
+            
+            {historyData?.pagination?.hasNextPage && (
+              <TouchableOpacity
+                style={styles.loadMoreButton}
+                onPress={() => setHistoryPage((p) => p + 1)}
+              >
+                <Text style={styles.loadMoreText}>Load More</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
       </ScrollView>
 
-      <CashDenominationModal
-        visible={cashModalVisible}
-        loading={cashSubmitting}
-        expectedAmount={summaryData?.settlements?.cashAssigned?.amount ?? 0}
-        onClose={() => setCashModalVisible(false)}
-        onSubmit={handleSubmitCashDenominations}
+      <SettleAmountModal
+        visible={settleModalVisible}
+        dueAmount={assignedTotal}
+        loading={!!settlingMethod}
+        onClose={() => setSettleModalVisible(false)}
+        onSubmit={handleSettleSubmit}
+        settlements={summaryData?.settlements}
+      />
+      <UpiPaymentModal
+        visible={upiModalVisible}
+        dueAmount={pendingUpiAmount}
+        loading={!!settlingMethod}
+        onClose={() => setUpiModalVisible(false)}
+        onSubmit={handleUpiSubmit as any}
       />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  customHeader: {
+    backgroundColor: '#1E65F3',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerDriverName: {
+    ...TYPO.h5,
+    color: DS.white,
+  },
+  headerDate: {
+    ...TYPO.b4,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  summaryCardContainer: {
+    backgroundColor: DS.white,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: DS.border,
+  },
+  blueBannerCard: {
+    backgroundColor: '#1E65F3',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  blueBannerTitle: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 11,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  blueBannerAmount: {
+    color: '#FFF',
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  blueBannerStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  blueBannerStatCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: 8,
+    padding: 10,
+  },
+  blueBannerStatLabel: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  blueBannerStatValue: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 4,
+  },
+  splitAmountsTitle: {
+    ...TYPO.s2,
+    color: TEXT_BLACK,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  splitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  splitLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  splitIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  splitLabel: {
+    ...TYPO.s2,
+    color: TEXT_BLACK,
+    fontWeight: '600',
+  },
+  splitAmount: {
+    ...TYPO.s2,
+    color: TEXT_BLACK,
+    fontWeight: 'bold',
+  },
+  splitDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginTop: 4,
+  },
+  totalLabel: {
+    ...TYPO.s2,
+    color: TEXT_BLACK,
+    fontWeight: 'bold',
+  },
+  totalAmount: {
+    ...TYPO.s1,
+    color: '#1E65F3',
+    fontWeight: 'bold',
+  },
+  ctaButton: {
+    backgroundColor: '#1E65F3',
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  ctaButtonDisabled: {
+    backgroundColor: DS.grey300,
+  },
+  ctaButtonText: {
+    ...TYPO.s2,
+    color: DS.white,
+    fontWeight: 'bold',
+  },
   content: {
     padding: 16,
     paddingBottom: 120,
@@ -781,7 +930,7 @@ const styles = StyleSheet.create({
 
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: DS.surface,
+    backgroundColor: "#F3F4F6",
     borderRadius: RADIUS.lg,
     padding: 4,
     marginBottom: 18,
@@ -799,6 +948,11 @@ const styles = StyleSheet.create({
 
   activeTabButton: {
     backgroundColor: DS.white,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
 
   tabText: {
@@ -1040,4 +1194,82 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     color: PALETTE.green600,
   },
+  loadMoreButton: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  loadMoreText: {
+    ...TYPO.b4,
+    color: DS.primary,
+    fontWeight: WEIGHT.semibold,
+  },
+  settlementRequestsContainer: {
+    backgroundColor: DS.white,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: DS.border,
+  },
+  settlementRequestsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  settlementRequestsTitle: {
+    ...TYPO.s2,
+    color: TEXT_BLACK,
+    fontWeight: 'bold',
+  },
+  settlementRequestsTotalPending: {
+    ...TYPO.b4,
+    color: DS.textSecondary,
+    marginTop: 4,
+  },
+  settlementRequestsCount: {
+    ...TYPO.c2,
+    color: DS.textSecondary,
+  },
+  emptyRequestsWrapper: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  emptyRequestsText: {
+    ...TYPO.b4,
+    color: DS.textSecondary,
+  },
+  pendingRequestsList: {
+    gap: 12,
+  },
+  pendingRequestItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
+  },
+  pendingRequestInfo: {
+    gap: 4,
+  },
+  pendingRequestMethod: {
+    ...TYPO.s2,
+    color: TEXT_BLACK,
+    fontWeight: '600',
+  },
+  pendingRequestMessage: {
+    ...TYPO.c2,
+    color: DS.orange,
+  },
+  pendingRequestAmount: {
+    ...TYPO.s2,
+    color: TEXT_BLACK,
+    fontWeight: 'bold',
+  }
 });
