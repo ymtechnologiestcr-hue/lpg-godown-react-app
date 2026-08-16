@@ -7,11 +7,29 @@ import type {
   PurchaseManagerOption,
 } from '../types';
 
-// Dedicated axios instance for file uploads — no timeout so large images don't abort.
-const uploadApi = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 0,
-});
+import { AUTH_TOKEN_KEY } from '../constants/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Reliable fetch wrapper for FormData uploads on React Native to bypass Axios bugs.
+const fetchUpload = async (url: string, formData: FormData) => {
+  const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+  const res = await fetch(`${API_BASE_URL}${url}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const err: any = new Error(json?.message || "Upload failed");
+    err.isAxiosError = true;
+    err.response = { status: res.status, data: json };
+    throw err;
+  }
+  return json;
+};
 
 // Upload the IOC invoice/photo and return the server-hosted URL. Mirrors the
 // odometer upload but targets the supporting-document endpoint.
@@ -23,14 +41,8 @@ export const uploadEmptyLoadInvoice = async (localUri: string): Promise<string> 
   const formData = new FormData();
   formData.append('file', { uri: localUri, name: filename, type: mimeType } as unknown as Blob);
 
-  const res = await uploadApi.post<{ url: string }>(
-    '/upload/supporting-document',
-    formData,
-    {
-      transformRequest: (data) => data,
-    }
-  );
-  return res.data.url;
+  const res = await fetchUpload('/upload/supporting-document', formData);
+  return res.url;
 };
 
 export const getPurchaseManagers = async (): Promise<PurchaseManagerOption[]> => {
