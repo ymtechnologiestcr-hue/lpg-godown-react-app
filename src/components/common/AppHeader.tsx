@@ -1,28 +1,40 @@
-import { Ionicons } from '@expo/vector-icons';
-import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useEffect, useMemo, useState } from 'react';
-import { Modal, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { AUTH_USER_KEY } from '../../constants/auth';
-import { DS, TYPO, RADIUS, PALETTE, WEIGHT } from '../../constants/designSystem';
-import { useDateRange } from '../../context/DateRangeContext';
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Image,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { AUTH_USER_KEY } from "../../constants/auth";
+import { DS, RADIUS, TYPO, WEIGHT } from "../../constants/designSystem";
+import { useDateRange } from "../../context/DateRangeContext";
 
-const WebDateInput: any = 'input';
+const WebDateInput: any = "input";
+
+const userAvatarUrl = require("../../../assets/images/driverimage.jpeg");
 
 export default function AppHeader() {
   const { range, setRange, resetToToday } = useDateRange();
 
-  const [userName, setUserName] = useState('');
+  const [userName, setUserName] = useState("");
 
   useEffect(() => {
     const loadUserName = async () => {
       try {
         const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
-        const name = typeof parsed?.name === 'string' ? parsed.name.trim() : '';
+        const name = typeof parsed?.name === "string" ? parsed.name.trim() : "";
         setUserName(name);
       } catch {
-        setUserName('');
+        setUserName("");
       }
     };
 
@@ -30,38 +42,48 @@ export default function AppHeader() {
   }, []);
 
   const [modalVisible, setModalVisible] = useState(false);
-  const [pickerTarget, setPickerTarget] = useState<'start' | 'end'>('start');
-  const [draftStart, setDraftStart] = useState(new Date(`${range.startDate}T00:00:00`));
-  const [draftEnd, setDraftEnd] = useState(new Date(`${range.endDate}T00:00:00`));
+  const [pickerTarget, setPickerTarget] = useState<"start" | "end">("start");
+  const [draftStart, setDraftStart] = useState(
+    new Date(`${range.startDate}T00:00:00`),
+  );
+  const [draftEnd, setDraftEnd] = useState(
+    new Date(`${range.endDate}T00:00:00`),
+  );
 
   const formatHeaderDate = useMemo(() => {
-    const start = new Date(`${range.startDate}T00:00:00`).toLocaleDateString('en-GB', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    const start = new Date(`${range.startDate}T00:00:00`).toLocaleDateString(
+      "en-GB",
+      {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      },
+    );
 
-    const end = new Date(`${range.endDate}T00:00:00`).toLocaleDateString('en-GB', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-    });
+    const end = new Date(`${range.endDate}T00:00:00`).toLocaleDateString(
+      "en-GB",
+      {
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      },
+    );
 
     return range.startDate === range.endDate ? start : `${start} - ${end}`;
   }, [range]);
 
-  const openPicker = (target: 'start' | 'end') => {
-    if (Platform.OS === 'android') {
+  const openPicker = (target: "start" | "end") => {
+    if (Platform.OS === "android") {
       DateTimePickerAndroid.open({
-        value: target === 'start' ? draftStart : draftEnd,
-        mode: 'date',
-        display: 'default',
+        value: target === "start" ? draftStart : draftEnd,
+        mode: "date",
+        display: "default",
         onValueChange: (_event, selectedDate) => {
           if (!selectedDate) return;
 
-          if (target === 'start') {
+          if (target === "start") {
             setDraftStart(selectedDate);
           } else {
             setDraftEnd(selectedDate);
@@ -77,8 +99,8 @@ export default function AppHeader() {
 
   const toIsoDate = (value: Date) => {
     const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, '0');
-    const d = String(value.getDate()).padStart(2, '0');
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   };
 
@@ -91,30 +113,30 @@ export default function AppHeader() {
   };
 
   const openModal = () => {
-    setPickerTarget('start');
+    setPickerTarget("start");
     setDraftStart(new Date(`${range.startDate}T00:00:00`));
     setDraftEnd(new Date(`${range.endDate}T00:00:00`));
     setModalVisible(true);
   };
 
   const formatDraftDate = (value: Date) =>
-    value.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
+    value.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
 
-  const pickerValue = pickerTarget === 'start' ? draftStart : draftEnd;
+  const pickerValue = pickerTarget === "start" ? draftStart : draftEnd;
 
-  const isStartActive = pickerTarget === 'start';
+  const isStartActive = pickerTarget === "start";
 
   const webInputStyle =
-    Platform.OS === 'web'
+    Platform.OS === "web"
       ? [
           styles.webInput,
           {
             WebkitTextFillColor: DS.textPrimary,
-            outlineStyle: 'none',
+            outlineStyle: "none",
           } as any,
         ]
       : styles.webInput;
@@ -122,14 +144,16 @@ export default function AppHeader() {
   const renderWebDateField = (
     label: string,
     value: Date,
-    onChangeValue: (nextValue: string) => void
+    onChangeValue: (nextValue: string) => void,
   ) => (
     <View style={styles.webFieldWrap}>
       <Text style={styles.webFieldLabel}>{label}</Text>
       <WebDateInput
         type="date"
         value={toIsoDate(value)}
-        onChange={(event: any) => onChangeValue(String(event?.target?.value || ''))}
+        onChange={(event: any) =>
+          onChangeValue(String(event?.target?.value || ""))
+        }
         style={webInputStyle as any}
       />
     </View>
@@ -137,7 +161,7 @@ export default function AppHeader() {
 
   const applyWebDateValue = (
     rawValue: string,
-    setter: (nextDate: Date) => void
+    setter: (nextDate: Date) => void,
   ) => {
     if (!rawValue) {
       return;
@@ -154,130 +178,177 @@ export default function AppHeader() {
 
   return (
     <>
-    <View style={styles.container}>
-      <View>
-        <Text style={styles.name}>{userName || 'User'}</Text>
-        <TouchableOpacity style={styles.datePress} onPress={openModal}>
-          <Ionicons name="calendar-outline" size={14} color={PALETTE.primary100} />
-          <Text style={styles.date}>{formatHeaderDate}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.iconRow}>
-        {/* <Feather name="search" size={20} color={DS.white} /> */}
-        {/* <Feather name="maximize" size={20} color={DS.white} /> */}
-        <Ionicons name="notifications-outline" size={20} color={DS.white} />
-      </View>
-    </View>
-
-    <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Select Date Range</Text>
-
-          {Platform.OS === 'web' && (
-            <View style={styles.webFieldsRow}>
-              {renderWebDateField('Start Date', draftStart, (rawValue) => {
-                applyWebDateValue(rawValue, setDraftStart);
-              })}
-
-              {renderWebDateField('End Date', draftEnd, (rawValue) => {
-                applyWebDateValue(rawValue, setDraftEnd);
-              })}
-            </View>
-          )}
-
-          {Platform.OS !== 'web' && (
-            <>
-              <TouchableOpacity
-                style={[styles.dateButton, isStartActive && styles.activeDateButton]}
-                onPress={() => openPicker('start')}
-              >
-                <Text style={styles.dateButtonLabel}>Start Date</Text>
-                <Text style={styles.dateButtonValue}>{formatDraftDate(draftStart)}</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.dateButton, !isStartActive && styles.activeDateButton]}
-                onPress={() => openPicker('end')}
-              >
-                <Text style={styles.dateButtonLabel}>End Date</Text>
-                <Text style={styles.dateButtonValue}>{formatDraftDate(draftEnd)}</Text>
-              </TouchableOpacity>
-            </>
-          )}
-
-          {Platform.OS === 'ios' && (
-            <View style={styles.pickerWrap}>
-              <DateTimePicker
-                value={pickerValue}
-                mode="date"
-                display="inline"
-                themeVariant="light"
-                accentColor={DS.primary}
-                onValueChange={(_event, selectedDate) => {
-                  if (pickerTarget === 'start') {
-                    setDraftStart(selectedDate);
-                  } else {
-                    setDraftEnd(selectedDate);
-                  }
-                }}
+      <View style={styles.container}>
+        <View style={styles.leftRow}>
+          <View style={styles.avatarWrap}>
+            {userAvatarUrl ? (
+              <Image
+                source={userAvatarUrl}
+                style={{ width: "100%", height: "100%", borderRadius: 18 }}
               />
-            </View>
-          )}
-
-          <View style={styles.modalActions}>
-            <TouchableOpacity style={styles.resetButton} onPress={async () => {
-              await resetToToday();
-              setModalVisible(false);
-            }}>
-              <Text style={styles.resetButtonText}>Today</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.applyButton} onPress={applyRange}>
-              <Text style={styles.applyButtonText}>Apply</Text>
-            </TouchableOpacity>
+            ) : (
+              <Ionicons name="person" size={18} color={DS.white} />
+            )}
           </View>
+          <Text style={styles.name}>Hi {userName || "User"} !</Text>
+        </View>
+
+        <View style={styles.iconRow}>
+          <TouchableOpacity style={styles.bellBtn}>
+            <Ionicons name="notifications" size={20} color={DS.primary} />
+            <View style={styles.notificationDot} />
+          </TouchableOpacity>
         </View>
       </View>
-    </Modal>
 
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Select Date Range</Text>
+
+            {Platform.OS === "web" && (
+              <View style={styles.webFieldsRow}>
+                {renderWebDateField("Start Date", draftStart, (rawValue) => {
+                  applyWebDateValue(rawValue, setDraftStart);
+                })}
+
+                {renderWebDateField("End Date", draftEnd, (rawValue) => {
+                  applyWebDateValue(rawValue, setDraftEnd);
+                })}
+              </View>
+            )}
+
+            {Platform.OS !== "web" && (
+              <>
+                <TouchableOpacity
+                  style={[
+                    styles.dateButton,
+                    isStartActive && styles.activeDateButton,
+                  ]}
+                  onPress={() => openPicker("start")}
+                >
+                  <Text style={styles.dateButtonLabel}>Start Date</Text>
+                  <Text style={styles.dateButtonValue}>
+                    {formatDraftDate(draftStart)}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.dateButton,
+                    !isStartActive && styles.activeDateButton,
+                  ]}
+                  onPress={() => openPicker("end")}
+                >
+                  <Text style={styles.dateButtonLabel}>End Date</Text>
+                  <Text style={styles.dateButtonValue}>
+                    {formatDraftDate(draftEnd)}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {Platform.OS === "ios" && (
+              <View style={styles.pickerWrap}>
+                <DateTimePicker
+                  value={pickerValue}
+                  mode="date"
+                  display="inline"
+                  themeVariant="light"
+                  accentColor={DS.primary}
+                  onValueChange={(_event, selectedDate) => {
+                    if (pickerTarget === "start") {
+                      setDraftStart(selectedDate);
+                    } else {
+                      setDraftEnd(selectedDate);
+                    }
+                  }}
+                />
+              </View>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={async () => {
+                  await resetToToday();
+                  setModalVisible(false);
+                }}
+              >
+                <Text style={styles.resetButtonText}>Today</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.applyButton} onPress={applyRange}>
+                <Text style={styles.applyButtonText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: DS.primary,
+    backgroundColor: DS.white,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingVertical: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  leftRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  avatarWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: DS.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
   },
   name: {
-    ...TYPO.h5,
-    color: DS.white,
-  },
-  date: {
-    ...TYPO.c1,
-    color: PALETTE.primary100,
-  },
-  datePress: {
-    marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    ...TYPO.s1,
+    color: "#0B0D12",
   },
   iconRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 14,
-    alignItems: 'center',
+    alignItems: "center",
+  },
+  bellBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#EEF2FF", // very light blue background for bell
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  notificationDot: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: DS.red,
+    borderWidth: 1.5,
+    borderColor: DS.white,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
     padding: 20,
   },
   modalCard: {
@@ -291,7 +362,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     borderRadius: RADIUS.md,
-    overflow: 'hidden',
+    overflow: "hidden",
     backgroundColor: DS.card,
     minHeight: 320,
   },
@@ -323,7 +394,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   webFieldsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     marginBottom: 10,
   },
@@ -336,7 +407,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   webInput: {
-    width: '100%',
+    width: "100%",
     minHeight: 46,
     borderWidth: 1,
     borderColor: DS.border,
@@ -350,8 +421,8 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     marginTop: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 10,
   },
   resetButton: {
@@ -359,7 +430,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 12,
   },
   resetButtonText: {
@@ -370,7 +441,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: DS.primary,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 12,
   },
   applyButtonText: {

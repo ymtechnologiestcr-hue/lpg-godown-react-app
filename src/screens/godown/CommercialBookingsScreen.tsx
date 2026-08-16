@@ -1,26 +1,32 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-import AppHeader from '../../components/common/AppHeader';
-import ScreenContainer from '../../components/common/ScreenContainer';
-import { DS, TYPO, EYEBROW, RADIUS, WEIGHT } from '../../constants/designSystem';
-import { useDateRange } from '../../context/DateRangeContext';
+import AppHeader from "../../components/common/AppHeader";
+import ScreenContainer from "../../components/common/ScreenContainer";
 import {
-    approveCommercialBooking,
-    getCommercialBookings,
-} from '../../services/godownService';
+  DS,
+  EYEBROW,
+  RADIUS,
+  TYPO,
+  WEIGHT,
+} from "../../constants/designSystem";
+import { useDateRange } from "../../context/DateRangeContext";
+import {
+  approveCommercialBooking,
+  getCommercialBookings,
+} from "../../services/godownService";
 
 type BookingItem = {
   bookingId: number;
@@ -56,7 +62,7 @@ type DriverGroup = {
   bookings: BookingItem[];
 };
 
-type TabType = 'ALL' | 'PENDING' | 'OUT' | 'DONE';
+type TabType = "ALL" | "PENDING" | "OUT" | "DONE";
 
 export default function CommercialBookingsScreen() {
   const { rangeKey } = useDateRange();
@@ -68,8 +74,8 @@ export default function CommercialBookingsScreen() {
 
   const [drivers, setDrivers] = useState<DriverGroup[]>([]);
   const [expanded, setExpanded] = useState<Record<number, boolean>>({});
-  const [search, setSearch] = useState('');
-  const [activeTab, setActiveTab] = useState<TabType>('ALL');
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<TabType>("ALL");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -78,7 +84,7 @@ export default function CommercialBookingsScreen() {
     try {
       const apiData = await getCommercialBookings({
         search,
-        status: activeTab === 'OUT' ? 'ALL' : activeTab,
+        status: activeTab === "OUT" ? "ALL" : activeTab,
       });
 
       setSummary(
@@ -86,7 +92,7 @@ export default function CommercialBookingsScreen() {
           bookings: 0,
           cylinders: 0,
           drivers: 0,
-        }
+        },
       );
 
       const driverRows: DriverGroup[] = apiData?.drivers || [];
@@ -106,8 +112,8 @@ export default function CommercialBookingsScreen() {
       });
     } catch (error: any) {
       Alert.alert(
-        'Error',
-        error?.response?.data?.message || 'Failed to fetch bookings'
+        "Error",
+        error?.response?.data?.message || "Failed to fetch bookings",
       );
     } finally {
       setLoading(false);
@@ -137,15 +143,15 @@ export default function CommercialBookingsScreen() {
       const response = await approveCommercialBooking(bookingId);
 
       if (response?.success) {
-        Alert.alert('Success', 'Booking approved successfully');
+        Alert.alert("Success", "Booking approved successfully");
         await fetchBookings();
       } else {
-        Alert.alert('Error', response?.message || 'Failed to approve booking');
+        Alert.alert("Error", response?.message || "Failed to approve booking");
       }
     } catch (error: any) {
       Alert.alert(
-        'Error',
-        error?.response?.data?.message || 'Failed to approve booking'
+        "Error",
+        error?.response?.data?.message || "Failed to approve booking",
       );
     }
   };
@@ -154,15 +160,15 @@ export default function CommercialBookingsScreen() {
     .map((driver) => {
       let filteredBookings = driver.bookings || [];
 
-      if (activeTab === 'PENDING') {
+      if (activeTab === "PENDING") {
         filteredBookings = filteredBookings.filter(
-          (booking) => Number(booking.isApproved) === 0
+          (booking) => Number(booking.isApproved) === 0,
         );
       }
 
-      if (activeTab === 'DONE' || activeTab === 'OUT') {
+      if (activeTab === "DONE" || activeTab === "OUT") {
         filteredBookings = filteredBookings.filter(
-          (booking) => Number(booking.isApproved) === 1
+          (booking) => Number(booking.isApproved) === 1,
         );
       }
 
@@ -212,14 +218,14 @@ export default function CommercialBookingsScreen() {
               style={styles.searchInput}
             />
           </View>
-
+          {/* 
           <TouchableOpacity style={styles.filterButton}>
             <Ionicons name="cube-outline" size={23} color={DS.textPrimary} />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
 
         <View style={styles.tabs}>
-          {(['ALL', 'PENDING', 'OUT', 'DONE'] as TabType[]).map((tab) => (
+          {(["ALL", "PENDING", "OUT", "DONE"] as TabType[]).map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.activeTab]}
@@ -231,13 +237,13 @@ export default function CommercialBookingsScreen() {
                   activeTab === tab && styles.activeTabText,
                 ]}
               >
-                {tab === 'ALL'
-                  ? 'All'
-                  : tab === 'PENDING'
-                    ? 'Pending'
-                    : tab === 'OUT'
-                      ? 'Out'
-                      : 'Done'}
+                {tab === "ALL"
+                  ? "All"
+                  : tab === "PENDING"
+                    ? "Pending"
+                    : tab === "OUT"
+                      ? "Out"
+                      : "Done"}
               </Text>
             </TouchableOpacity>
           ))}
@@ -253,7 +259,7 @@ export default function CommercialBookingsScreen() {
             const isOpen = expanded[driver.driverId];
 
             const openCount = driver.bookings.filter(
-              (booking) => Number(booking.isApproved) === 0
+              (booking) => Number(booking.isApproved) === 0,
             ).length;
 
             return (
@@ -272,11 +278,7 @@ export default function CommercialBookingsScreen() {
                   }
                 >
                   <View style={styles.driverIconBox}>
-                    <Ionicons
-                      name="bus-outline"
-                      size={25}
-                      color={DS.primary}
-                    />
+                    <Ionicons name="bus-outline" size={25} color={DS.primary} />
                   </View>
 
                   <View style={styles.driverInfo}>
@@ -289,7 +291,7 @@ export default function CommercialBookingsScreen() {
                         color={DS.textSecondary}
                       />
                       <Text style={styles.driverPhone}>
-                        {driver.driverPhone || 'N/A'}
+                        {driver.driverPhone || "N/A"}
                       </Text>
                     </View>
                   </View>
@@ -303,7 +305,7 @@ export default function CommercialBookingsScreen() {
                   </Text>
 
                   <Ionicons
-                    name={isOpen ? 'chevron-up' : 'chevron-down'}
+                    name={isOpen ? "chevron-up" : "chevron-down"}
                     size={24}
                     color={DS.textSecondary}
                   />
@@ -362,40 +364,32 @@ function BookingCard({
 
         <View style={approved ? styles.outBadge : styles.pendingBadge}>
           <Text style={approved ? styles.outText : styles.pendingText}>
-            {approved ? 'OUT' : 'PENDING'}
+            {approved ? "OUT" : "PENDING"}
           </Text>
         </View>
       </View>
 
       <View style={styles.bookingMetaRow}>
-        <Ionicons
-          name="location-outline"
-          size={18}
-          color={DS.textSecondary}
-        />
+        <Ionicons name="location-outline" size={18} color={DS.textSecondary} />
         <Text style={styles.bookingMetaText} numberOfLines={1}>
-          {booking.address || 'No address'}
+          {booking.address || "No address"}
         </Text>
       </View>
 
       <View style={styles.bookingMetaRow}>
-        <Ionicons
-          name="time-outline"
-          size={18}
-          color={DS.textSecondary}
-        />
+        <Ionicons name="time-outline" size={18} color={DS.textSecondary} />
 
         <Text style={styles.bookingMetaText}>
-          {new Date(booking.createdAt).toLocaleTimeString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
+          {new Date(booking.createdAt).toLocaleTimeString("en-IN", {
+            hour: "2-digit",
+            minute: "2-digit",
           })}
         </Text>
 
         <Ionicons name="cube-outline" size={18} color={DS.green} />
 
         <Text style={styles.productQtyText}>
-          {firstItem?.productName || 'Commercial'} × {booking.totalQty}
+          {firstItem?.productName || "Commercial"} × {booking.totalQty}
         </Text>
       </View>
 
@@ -405,13 +399,9 @@ function BookingCard({
         disabled={approved}
         onPress={onApprove}
       >
-        <Ionicons
-          name="checkmark-circle-outline"
-          size={22}
-          color={DS.white}
-        />
+        <Ionicons name="checkmark-circle-outline" size={22} color={DS.white} />
         <Text style={styles.approveButtonText}>
-          {approved ? 'Approved' : 'Approve'}
+          {approved ? "Approved" : "Approve"}
         </Text>
       </TouchableOpacity>
     </View>
@@ -425,8 +415,8 @@ const styles = StyleSheet.create({
   },
 
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 24,
     gap: 22,
   },
@@ -437,7 +427,7 @@ const styles = StyleSheet.create({
   },
 
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 20,
   },
@@ -463,7 +453,7 @@ const styles = StyleSheet.create({
   },
 
   searchRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginBottom: 14,
   },
@@ -475,8 +465,8 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.card,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 14,
     gap: 10,
   },
@@ -494,12 +484,12 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.card,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   tabs: {
-    flexDirection: 'row',
+    flexDirection: "row",
     backgroundColor: DS.grey100,
     borderRadius: RADIUS.lg,
     padding: 4,
@@ -510,8 +500,8 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 46,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   activeTab: {
@@ -534,19 +524,19 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     marginBottom: 14,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
 
   driverBoxExpanded: {
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
   },
 
   driverHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
   },
 
@@ -555,8 +545,8 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: RADIUS.md,
     backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
 
@@ -570,8 +560,8 @@ const styles = StyleSheet.create({
   },
 
   phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 4,
     gap: 5,
   },
@@ -619,9 +609,9 @@ const styles = StyleSheet.create({
   },
 
   bookingTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 12,
   },
 
@@ -665,8 +655,8 @@ const styles = StyleSheet.create({
   },
 
   bookingMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 7,
     marginTop: 8,
   },
@@ -687,9 +677,9 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.buttonGreen,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 18,
     gap: 10,
   },
@@ -705,7 +695,7 @@ const styles = StyleSheet.create({
 
   loaderBox: {
     paddingVertical: 50,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   loadingText: {
@@ -720,7 +710,7 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     padding: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   emptyText: {

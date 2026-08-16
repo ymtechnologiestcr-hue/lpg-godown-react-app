@@ -1,26 +1,27 @@
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { DimensionValue } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { DimensionValue } from "react-native";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-import AppHeader from '../components/common/AppHeader';
-import ScreenContainer from '../components/common/ScreenContainer';
-import { AUTH_USER_KEY } from '../constants/auth';
-import { DS, TYPO, EYEBROW, RADIUS, PALETTE } from '../constants/designSystem';
-import api from '../services/api';
+import AppHeader from "../components/common/AppHeader";
+import ScreenContainer from "../components/common/ScreenContainer";
+import { AUTH_USER_KEY } from "../constants/auth";
+import { DS, EYEBROW, PALETTE, RADIUS, TYPO } from "../constants/designSystem";
+import api from "../services/api";
 
-type ProductType = 'DOMESTIC' | 'COMMERCIAL';
+type ProductType = "DOMESTIC" | "COMMERCIAL";
 
 type AllocatedCylinderItem = {
   id: number;
@@ -67,38 +68,38 @@ type BatchCounterItem = {
 };
 
 const formatProductType = (type?: string) => {
-  if (type === 'DOMESTIC') return 'Domestic';
-  if (type === 'COMMERCIAL') return 'Commercial';
-  return type || '';
+  if (type === "DOMESTIC") return "Domestic";
+  if (type === "COMMERCIAL") return "Commercial";
+  return type || "";
 };
 
 const getProductSize = (item: Partial<AllocatedCylinderItem>) => {
   if (item.size) return item.size;
   const match = item.productName?.match(/\d+\.?\d*\s?kg/i);
-  return match?.[0] ? match[0].replace(/\s/g, ' ') : '';
+  return match?.[0] ? match[0].replace(/\s/g, " ") : "";
 };
 
 const formatDate = (date?: string) => {
-  if (!date) return '-';
+  if (!date) return "-";
 
   try {
-    return new Date(date).toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      hour: 'numeric',
-      minute: '2-digit',
+    return new Date(date).toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      hour: "numeric",
+      minute: "2-digit",
       hour12: true,
     });
   } catch {
-    return '-';
+    return "-";
   }
 };
 
 const getProgressWidth = (item: AllocatedCylinderItem): DimensionValue => {
-  if (!item.totalAllocated) return '0%';
+  if (!item.totalAllocated) return "0%";
   const width = Math.min(
     100,
-    Math.round((item.delivered / item.totalAllocated) * 100)
+    Math.round((item.delivered / item.totalAllocated) * 100),
   );
   return `${width}%` as DimensionValue;
 };
@@ -129,7 +130,7 @@ export default function AllocatedCylindersScreen() {
   const [batchLoading, setBatchLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const loadDriverId = async () => {
@@ -141,11 +142,11 @@ export default function AllocatedCylindersScreen() {
         if (id && !Number.isNaN(id)) {
           setDriverId(id);
         } else {
-          setError('Driver not found in session');
+          setError("Driver not found in session");
           setLoading(false);
         }
       } catch {
-        setError('Failed to load driver session');
+        setError("Failed to load driver session");
         setLoading(false);
       }
     };
@@ -159,10 +160,10 @@ export default function AllocatedCylindersScreen() {
     }
 
     try {
-      setError('');
+      setError("");
 
       const response = await api.get(
-        `/drivers/${driverId}/allocated-cylinders`
+        `/drivers/${driverId}/allocated-cylinders`,
       );
 
       if (response.data?.success) {
@@ -177,14 +178,14 @@ export default function AllocatedCylindersScreen() {
           items: response.data.data?.items || [],
         });
       } else {
-        setError('Failed to load allocated cylinders');
+        setError("Failed to load allocated cylinders");
       }
     } catch (err: any) {
       console.error(
-        'fetchAllocatedCylinders error:',
-        err?.response?.data || err.message
+        "fetchAllocatedCylinders error:",
+        err?.response?.data || err.message,
       );
-      setError('Failed to load allocated cylinders');
+      setError("Failed to load allocated cylinders");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -216,7 +217,7 @@ export default function AllocatedCylindersScreen() {
       setBatchLoading(true);
 
       const response = await api.get(
-        `/drivers/${driverId}/allocated-batches/${item.allocationSalesItemId}`
+        `/drivers/${driverId}/allocated-batches/${item.allocationSalesItemId}`,
       );
 
       if (response.data?.success) {
@@ -244,12 +245,12 @@ export default function AllocatedCylindersScreen() {
           latestSaleId: detail.allocationSaleId,
         });
       } else {
-        Alert.alert('Error', response.data?.message || 'Batch not found');
+        Alert.alert("Error", response.data?.message || "Batch not found");
       }
     } catch (err: any) {
       Alert.alert(
-        'Error',
-        err?.response?.data?.message || 'Failed to open batch'
+        "Error",
+        err?.response?.data?.message || "Failed to open batch",
       );
     } finally {
       setBatchLoading(false);
@@ -281,13 +282,13 @@ export default function AllocatedCylindersScreen() {
     setDefectiveModalVisible(true);
   };
 
-  const updateCounter = (index: number, direction: 'PLUS' | 'MINUS') => {
+  const updateCounter = (index: number, direction: "PLUS" | "MINUS") => {
     setCounterItems((prev) =>
       prev.map((item, itemIndex) => {
         if (itemIndex !== index) return item;
 
         const nextValue =
-          direction === 'PLUS'
+          direction === "PLUS"
             ? Math.min(item.quantity + 1, item.maxQuantity)
             : Math.max(item.quantity - 1, 0);
 
@@ -295,13 +296,13 @@ export default function AllocatedCylindersScreen() {
           ...item,
           quantity: nextValue,
         };
-      })
+      }),
     );
   };
 
   const totalSelected = counterItems.reduce(
     (sum, item) => sum + Number(item.quantity || 0),
-    0
+    0,
   );
 
   const submitBatchRequest = async (isDefective: 0 | 1) => {
@@ -310,14 +311,14 @@ export default function AllocatedCylindersScreen() {
     const validItems = counterItems.filter((item) => item.quantity > 0);
 
     if (!validItems.length) {
-      Alert.alert('Required', 'Please select at least one cylinder');
+      Alert.alert("Required", "Please select at least one cylinder");
       return;
     }
 
     try {
       setSubmitting(true);
 
-      const response = await api.post('/drivers/in-hand/request', {
+      const response = await api.post("/drivers/in-hand/request", {
         driver_id: driverId,
         is_defective: isDefective,
         allocation_sale_id: selectedBatch.allocationSaleId,
@@ -333,27 +334,15 @@ export default function AllocatedCylindersScreen() {
       });
 
       if (response.data?.success) {
-        Alert.alert(
-          'Success',
-          isDefective === 1
-            ? 'Defective request submitted'
-            : 'Return request submitted'
-        );
-
         setReturnModalVisible(false);
         setDefectiveModalVisible(false);
         setCounterItems([]);
         setSelectedBatch(null);
 
         await fetchAllocatedCylinders();
-      } else {
-        Alert.alert('Error', response.data?.message || 'Request failed');
       }
     } catch (err: any) {
-      Alert.alert(
-        'Error',
-        err?.response?.data?.message || 'Failed to submit request'
-      );
+      // Handled by global API interceptor
     } finally {
       setSubmitting(false);
     }
@@ -370,29 +359,22 @@ export default function AllocatedCylindersScreen() {
               style={styles.backButton}
               onPress={() => setSelectedBatch(null)}
             >
-              <Ionicons
-                name="arrow-back"
-                size={24}
-                color={DS.textPrimary}
-              />
+              <Ionicons name="arrow-back" size={24} color={DS.textPrimary} />
             </TouchableOpacity>
 
             <Text style={styles.detailTitle}>
-              {selectedBatch.productType === 'DOMESTIC'
-                ? 'LPG Domestic'
-                : 'LPG Commercial'}
+              {selectedBatch.productType === "DOMESTIC"
+                ? "LPG Domestic"
+                : "LPG Commercial"}
             </Text>
           </View>
 
           <View style={styles.detailMainCard}>
             <View style={styles.detailTopRow}>
-              <View style={styles.detailIconBox}>
-                <Ionicons
-                  name="cube-outline"
-                  size={34}
-                  color={DS.primary}
-                />
-              </View>
+              <Image
+                source={require("../../assets/images/Cylinder.png")}
+                style={{ width: 42, height: 48, resizeMode: "contain" }}
+              />
 
               <View style={styles.detailTitleBox}>
                 <Text style={styles.detailUnits}>
@@ -400,7 +382,7 @@ export default function AllocatedCylindersScreen() {
                 </Text>
 
                 <Text style={styles.detailSubText}>
-                  {formatProductType(selectedBatch.productType)} ·{' '}
+                  {formatProductType(selectedBatch.productType)} ·{" "}
                   {getProductSize(selectedBatch)}
                 </Text>
               </View>
@@ -452,7 +434,8 @@ export default function AllocatedCylindersScreen() {
               />
             </View>
 
-            {((selectedBatch.returned ?? 0) > 0 || (selectedBatch.defective ?? 0) > 0) && (
+            {((selectedBatch.returned ?? 0) > 0 ||
+              (selectedBatch.defective ?? 0) > 0) && (
               <View style={styles.detailStatsRow}>
                 <DetailStat
                   label="RETURNED"
@@ -470,21 +453,17 @@ export default function AllocatedCylindersScreen() {
               </View>
             )}
           </View>
-
+          {/* 
           <View style={styles.smallStatsRow}>
             <View style={styles.smallStatCard}>
               <View style={styles.smallStatIconBlue}>
-                <Ionicons
-                  name="home-outline"
-                  size={24}
-                  color={DS.primary}
-                />
+                <Ionicons name="home-outline" size={24} color={DS.primary} />
               </View>
 
               <View>
                 <Text style={styles.smallStatLabel}>DOMESTIC</Text>
                 <Text style={styles.smallStatValue}>
-                  {selectedBatch.productType === 'DOMESTIC'
+                  {selectedBatch.productType === "DOMESTIC"
                     ? selectedBatch.totalAllocated
                     : 0}
                 </Text>
@@ -493,23 +472,19 @@ export default function AllocatedCylindersScreen() {
 
             <View style={styles.smallStatCard}>
               <View style={styles.smallStatIconOrange}>
-                <Ionicons
-                  name="business-outline"
-                  size={24}
-                  color={DS.orange}
-                />
+                <Ionicons name="business-outline" size={24} color={DS.orange} />
               </View>
 
               <View>
                 <Text style={styles.smallStatLabel}>COMMERCIAL</Text>
                 <Text style={styles.smallStatValue}>
-                  {selectedBatch.productType === 'COMMERCIAL'
+                  {selectedBatch.productType === "COMMERCIAL"
                     ? selectedBatch.totalAllocated
                     : 0}
                 </Text>
               </View>
             </View>
-          </View>
+          </View> */}
 
           <Text style={styles.sectionTitle}>ITEM WEIGHTS</Text>
 
@@ -547,7 +522,9 @@ export default function AllocatedCylindersScreen() {
               size={22}
               color={DS.primary}
             />
-            <Text style={styles.returnOutlineText}>Return in-hand to Godown</Text>
+            <Text style={styles.returnOutlineText}>
+              Return in-hand to Godown
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -662,14 +639,17 @@ function AllocatedCard({ item }: { item: AllocatedCylinderItem }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
-        <View style={styles.iconBox}>
-          <Ionicons name="cube-outline" size={30} color={DS.primary} />
+        <View style={[styles.iconBox, { backgroundColor: "transparent" }]}>
+          <Image
+            source={require("../../assets/images/Cylinder.png")}
+            style={{ width: 42, height: 48, resizeMode: "contain" }}
+          />
         </View>
 
         <View style={styles.productInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.productName} numberOfLines={1}>
-              {item.productName}
+              {item.productName}:
             </Text>
 
             <View style={styles.typePill}>
@@ -690,7 +670,9 @@ function AllocatedCard({ item }: { item: AllocatedCylinderItem }) {
               color={DS.textSecondary}
             />
 
-            <Text style={styles.batchText}>{formatDate(item.lastAllocatedAt)}</Text>
+            <Text style={styles.batchText}>
+              {formatDate(item.lastAllocatedAt)}
+            </Text>
           </View>
 
           {item.isCarryForward && item.pending > 0 ? (
@@ -706,15 +688,13 @@ function AllocatedCard({ item }: { item: AllocatedCylinderItem }) {
           <Text style={styles.unitsLabel}>units</Text>
         </View>
 
-        <Ionicons
-          name="chevron-forward"
-          size={22}
-          color={DS.textSecondary}
-        />
+        <Ionicons name="chevron-forward" size={22} color={DS.textSecondary} />
       </View>
 
       <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: getProgressWidth(item) }]} />
+        <View
+          style={[styles.progressFill, { width: getProgressWidth(item) }]}
+        />
       </View>
 
       <View style={styles.statsRow}>
@@ -816,11 +796,16 @@ function BatchCounterModal({
   totalSelected: number;
   submitting: boolean;
   onClose: () => void;
-  onChange: (index: number, direction: 'PLUS' | 'MINUS') => void;
+  onChange: (index: number, direction: "PLUS" | "MINUS") => void;
   onSubmit: () => void;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <View style={styles.modalOverlay}>
         <TouchableOpacity style={styles.modalBackdrop} onPress={onClose} />
 
@@ -844,18 +829,22 @@ function BatchCounterModal({
 
           <View style={styles.counterList}>
             {items.map((item, index) => (
-              <View key={`${item.productId}-${index}`} style={styles.counterRow}>
+              <View
+                key={`${item.productId}-${index}`}
+                style={styles.counterRow}
+              >
                 <View style={styles.counterLeft}>
-                  <Ionicons
+                  {/* <Ionicons
                     name="bag-handle-outline"
                     size={22}
                     color={DS.textSecondary}
-                  />
+                  /> */}
 
                   <View>
                     <Text style={styles.counterName}>{item.size}</Text>
                     <Text style={styles.counterMeta}>
-                      {formatProductType(item.productType)} · max {item.maxQuantity}
+                      {formatProductType(item.productType)} · max{" "}
+                      {item.maxQuantity}
                     </Text>
                   </View>
                 </View>
@@ -863,7 +852,7 @@ function BatchCounterModal({
                 <View style={styles.counterRight}>
                   <TouchableOpacity
                     style={styles.counterButton}
-                    onPress={() => onChange(index, 'MINUS')}
+                    onPress={() => onChange(index, "MINUS")}
                   >
                     <Text style={styles.counterButtonText}>−</Text>
                   </TouchableOpacity>
@@ -872,7 +861,7 @@ function BatchCounterModal({
 
                   <TouchableOpacity
                     style={styles.counterButton}
-                    onPress={() => onChange(index, 'PLUS')}
+                    onPress={() => onChange(index, "PLUS")}
                   >
                     <Text style={styles.counterButtonText}>+</Text>
                   </TouchableOpacity>
@@ -890,7 +879,8 @@ function BatchCounterModal({
             style={[
               styles.modalSubmitButton,
               {
-                backgroundColor: totalSelected > 0 ? buttonColor : PALETTE.primary200,
+                backgroundColor:
+                  totalSelected > 0 ? buttonColor : PALETTE.primary200,
               },
             ]}
             disabled={submitting || totalSelected <= 0}
@@ -915,14 +905,14 @@ const styles = StyleSheet.create({
   },
 
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 18,
   },
 
   backButton: {
     width: 42,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
 
   titleTextWrap: {
@@ -950,8 +940,8 @@ const styles = StyleSheet.create({
   },
 
   cardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   iconBox: {
@@ -959,8 +949,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 14,
   },
 
@@ -969,8 +959,8 @@ const styles = StyleSheet.create({
   },
 
   nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
 
@@ -989,7 +979,9 @@ const styles = StyleSheet.create({
 
   typePillText: {
     ...TYPO.c2,
-    color: DS.textSecondary,
+    // color: DS.textSecondary,
+    fontWeight: "500",
+    fontSize: 12,
   },
 
   productSize: {
@@ -999,16 +991,16 @@ const styles = StyleSheet.create({
   },
 
   batchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 7,
     marginTop: 12,
   },
 
   carryForwardPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
     gap: 4,
     marginTop: 8,
     paddingHorizontal: 8,
@@ -1028,7 +1020,7 @@ const styles = StyleSheet.create({
   },
 
   unitsBox: {
-    alignItems: 'center',
+    alignItems: "center",
     marginLeft: 8,
   },
 
@@ -1047,18 +1039,18 @@ const styles = StyleSheet.create({
     height: 10,
     backgroundColor: DS.grey100,
     borderRadius: RADIUS.pill,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginTop: 22,
   },
 
   progressFill: {
-    height: '100%',
+    height: "100%",
     backgroundColor: DS.green,
     borderRadius: RADIUS.pill,
   },
 
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginTop: 24,
   },
@@ -1068,8 +1060,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     paddingVertical: 13,
     paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 9,
   },
 
@@ -1089,8 +1081,8 @@ const styles = StyleSheet.create({
   },
 
   detailHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 28,
   },
 
@@ -1109,8 +1101,8 @@ const styles = StyleSheet.create({
   },
 
   detailTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   detailIconBox: {
@@ -1118,8 +1110,8 @@ const styles = StyleSheet.create({
     height: 68,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 18,
   },
 
@@ -1139,8 +1131,8 @@ const styles = StyleSheet.create({
   },
 
   metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     marginTop: 22,
   },
@@ -1151,7 +1143,7 @@ const styles = StyleSheet.create({
   },
 
   detailStatsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
     marginTop: 20,
   },
@@ -1160,7 +1152,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: RADIUS.md,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   detailStatLabel: {
@@ -1174,7 +1166,7 @@ const styles = StyleSheet.create({
   },
 
   smallStatsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 14,
     marginBottom: 26,
   },
@@ -1185,8 +1177,8 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 16,
     backgroundColor: DS.card,
   },
@@ -1195,8 +1187,8 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: DS.primarySoft,
   },
 
@@ -1204,8 +1196,8 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: DS.orangeSoft,
   },
 
@@ -1229,21 +1221,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
-    overflow: 'hidden',
+    overflow: "hidden",
     backgroundColor: DS.card,
     marginBottom: 34,
   },
 
   weightRow: {
     padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 
   weightLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 14,
   },
 
@@ -1253,8 +1245,8 @@ const styles = StyleSheet.create({
   },
 
   weightRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 16,
   },
 
@@ -1281,9 +1273,9 @@ const styles = StyleSheet.create({
     borderColor: DS.primarySoftBorder,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.primarySoft,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 14,
     paddingVertical: 12,
     marginBottom: 14,
@@ -1300,9 +1292,9 @@ const styles = StyleSheet.create({
     borderColor: PALETTE.red100,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.redSoft,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 14,
     paddingVertical: 12,
   },
@@ -1314,12 +1306,12 @@ const styles = StyleSheet.create({
 
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
   },
 
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: "rgba(0,0,0,0.65)",
   },
 
   modalSheet: {
@@ -1332,14 +1324,14 @@ const styles = StyleSheet.create({
   },
 
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   modalTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
 
@@ -1364,14 +1356,14 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   counterLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 14,
     flex: 1,
   },
@@ -1388,8 +1380,8 @@ const styles = StyleSheet.create({
   },
 
   counterRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 18,
   },
 
@@ -1399,8 +1391,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: DS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   counterButtonText: {
@@ -1411,7 +1403,7 @@ const styles = StyleSheet.create({
   counterValue: {
     ...TYPO.h5,
     minWidth: 30,
-    textAlign: 'center',
+    textAlign: "center",
     color: DS.textPrimary,
   },
 
@@ -1422,8 +1414,8 @@ const styles = StyleSheet.create({
     marginTop: 28,
     paddingHorizontal: 18,
     paddingTop: 24,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
 
   totalSelectedText: {
@@ -1439,8 +1431,8 @@ const styles = StyleSheet.create({
   modalSubmitButton: {
     minHeight: 56,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
     marginTop: 20,
   },
@@ -1452,7 +1444,7 @@ const styles = StyleSheet.create({
 
   centerBox: {
     paddingVertical: 60,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   infoText: {
@@ -1485,7 +1477,7 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     paddingVertical: 30,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   emptyText: {

@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as ImagePicker from 'expo-image-picker';
-import { isAxiosError } from 'axios';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { isAxiosError } from "axios";
+import * as ImagePicker from "expo-image-picker";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -14,18 +14,28 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-import { AUTH_USER_KEY } from '../../constants/auth';
-import { DS, TYPO, EYEBROW, RADIUS, PALETTE, WEIGHT } from '../../constants/designSystem';
-import { getPurchaseBootstrap, startPurchaseTrip, uploadOdometerImage } from '../../services/purchaseService';
-import type { PurchaseBootstrap, PurchaseTripOverview } from '../../types';
+import { AUTH_USER_KEY } from "../../constants/auth";
+import {
+  DS,
+  EYEBROW,
+  PALETTE,
+  RADIUS,
+  TYPO,
+  WEIGHT,
+} from "../../constants/designSystem";
+import {
+  getPurchaseBootstrap,
+  startPurchaseTrip,
+} from "../../services/purchaseService";
+import type { PurchaseBootstrap, PurchaseTripOverview } from "../../types";
 
 export default function PurchaseStartTripScreen() {
   const [bootstrap, setBootstrap] = useState<PurchaseBootstrap | null>(null);
   const [storedUserId, setStoredUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [odometerReading, setOdometerReading] = useState('');
+  const [odometerReading, setOdometerReading] = useState("");
   const [odometerImageUri, setOdometerImageUri] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,8 +53,11 @@ export default function PurchaseStartTripScreen() {
         const data = await getPurchaseBootstrap();
         setBootstrap(data);
       } catch (error) {
-        console.log('Purchase bootstrap error:', error);
-        Alert.alert('Warning', 'Could not load purchase bootstrap details. Please check your connection and try again.');
+        console.log("Purchase bootstrap error:", error);
+        Alert.alert(
+          "Warning",
+          "Could not load purchase bootstrap details. Please check your connection and try again.",
+        );
       } finally {
         setLoading(false);
       }
@@ -62,7 +75,7 @@ export default function PurchaseStartTripScreen() {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ["images"],
         quality: 0.6,
       });
 
@@ -70,7 +83,7 @@ export default function PurchaseStartTripScreen() {
         setOdometerImageUri(result.assets[0]?.uri ?? null);
       }
     } catch (error) {
-      console.log('Capture odometer error:', error);
+      console.log("Capture odometer error:", error);
     }
   };
 
@@ -78,66 +91,57 @@ export default function PurchaseStartTripScreen() {
     const managerId = Number(bootstrap?.manager?.id || storedUserId || 0);
 
     if (!managerId) {
-      Alert.alert('Unable to start trip', 'Purchase manager account not found. Please login again.');
+      Alert.alert(
+        "Unable to start trip",
+        "Purchase manager account not found. Please login again.",
+      );
       return;
     }
 
     try {
       setSubmitting(true);
 
-      // Upload the local image to the server and get a real URL
-      let uploadedImageUrl: string | null = null;
-      if (odometerImageUri) {
-        try {
-          uploadedImageUrl = await uploadOdometerImage(odometerImageUri);
-        } catch (uploadError: any) {
-          console.log('Upload odometer image error:', uploadError?.response?.data || uploadError?.message || uploadError);
-          Alert.alert('Upload Failed', 'Could not upload odometer photo. Please check internet and try again.');
-          setSubmitting(false);
-          return;
-        }
-      }
-
       const trip = await startPurchaseTrip({
         userId: managerId,
         stockAreaId: bootstrap?.defaultStockArea?.id ?? null,
         odometerReading: Number(odometerReading || 0),
-        odometerImageUrl: uploadedImageUrl,
+        odometerImageUri, // Pass the local URI directly to the service
       });
 
-      DeviceEventEmitter.emit('PURCHASE_FLOW_UPDATED');
+      DeviceEventEmitter.emit("PURCHASE_FLOW_UPDATED");
       router.replace({
-        pathname: '/purchase/create-load',
+        pathname: "/purchase/create-load",
         params: { tripId: String(trip.id) },
       } as any);
     } catch (error) {
-      console.log('Start purchase trip error:', error);
+      console.log("Start purchase trip error:", error);
 
       if (isAxiosError(error) && error.response?.status === 409) {
-        const activeTrip = (error.response?.data?.data || null) as PurchaseTripOverview | null;
+        const activeTrip = (error.response?.data?.data ||
+          null) as PurchaseTripOverview | null;
 
         if (activeTrip?.id) {
           Alert.alert(
-            'Trip already active',
-            'An active trip already exists. Continue with that trip now.',
+            "Trip already active",
+            "An active trip already exists. Continue with that trip now.",
             [
               {
-                text: 'Continue',
+                text: "Continue",
                 onPress: () => {
                   router.replace({
-                    pathname: '/purchase/create-load',
+                    pathname: "/purchase/create-load",
                     params: { tripId: String(activeTrip.id) },
                   } as any);
                 },
               },
-            ]
+            ],
           );
         }
 
         return;
       }
 
-      Alert.alert('Error', 'Could not start trip right now. Please try again.');
+      Alert.alert("Error", "Could not start trip right now. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -155,7 +159,10 @@ export default function PurchaseStartTripScreen() {
     <View style={styles.screen}>
       <View style={styles.sheet}>
         <View style={styles.topRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
             <Ionicons name="arrow-back" size={18} color={DS.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.title}>Start New Trip</Text>
@@ -172,13 +179,24 @@ export default function PurchaseStartTripScreen() {
         />
 
         <Text style={styles.label}>PHOTO OF ODOMETER</Text>
-        <TouchableOpacity activeOpacity={0.88} style={styles.captureCard} onPress={handleCapture}>
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={styles.captureCard}
+          onPress={handleCapture}
+        >
           {odometerImageUri ? (
-            <Image source={{ uri: odometerImageUri }} style={styles.capturePreview} />
+            <Image
+              source={{ uri: odometerImageUri }}
+              style={styles.capturePreview}
+            />
           ) : (
             <View style={styles.capturePlaceholder}>
               <View style={styles.captureIconWrap}>
-                <Ionicons name="camera-outline" size={22} color={DS.textSecondary} />
+                <Ionicons
+                  name="camera-outline"
+                  size={22}
+                  color={DS.textSecondary}
+                />
               </View>
               <Text style={styles.captureText}>TAP TO CAPTURE</Text>
             </View>
@@ -186,11 +204,16 @@ export default function PurchaseStartTripScreen() {
         </TouchableOpacity>
 
         <View style={styles.noticeCard}>
-          <Ionicons name="checkmark-circle-outline" size={18} color={DS.primary} />
+          <Ionicons
+            name="checkmark-circle-outline"
+            size={18}
+            color={DS.primary}
+          />
           <View style={{ flex: 1 }}>
             <Text style={styles.noticeTitle}>VERIFICATION NOTICE</Text>
             <Text style={styles.noticeText}>
-              Make sure the KM reading is clearly visible to avoid approval delays. Photo is optional but recommended.
+              Make sure the KM reading is clearly visible to avoid approval
+              delays. Photo is optional but recommended.
             </Text>
           </View>
         </View>
@@ -203,11 +226,13 @@ export default function PurchaseStartTripScreen() {
               ? styles.submitButtonDisabled
               : null,
           ]}
-          disabled={!odometerReading || Number(odometerReading) <= 0 || submitting}
+          disabled={
+            !odometerReading || Number(odometerReading) <= 0 || submitting
+          }
           onPress={handleSubmit}
         >
           <Text style={styles.submitText}>
-            {submitting ? 'Starting Trip...' : 'Submit & Start Trip'}
+            {submitting ? "Starting Trip..." : "Submit & Start Trip"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -219,13 +244,13 @@ const styles = StyleSheet.create({
   loaderScreen: {
     flex: 1,
     backgroundColor: DS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   screen: {
     flex: 1,
     backgroundColor: DS.background,
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 16,
   },
   sheet: {
@@ -236,8 +261,8 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
   },
   topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
     marginBottom: 22,
   },
@@ -245,8 +270,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: DS.surface,
   },
   title: {
@@ -277,19 +302,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     backgroundColor: DS.surface,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   capturePlaceholder: {
     minHeight: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   captureIconWrap: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: DS.white,
     borderWidth: 1,
     borderColor: DS.border,
@@ -301,7 +326,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   capturePreview: {
-    width: '100%',
+    width: "100%",
     height: 220,
   },
   noticeCard: {
@@ -311,7 +336,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.primarySoftBorder,
     padding: 14,
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
   },
   noticeTitle: {
@@ -328,8 +353,8 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 20,
   },
   submitButtonDisabled: {

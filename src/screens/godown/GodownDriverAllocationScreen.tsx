@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,15 +10,21 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-import AppHeader from '../../components/common/AppHeader';
-import ScreenContainer from '../../components/common/ScreenContainer';
-import { DS, TYPO, EYEBROW, RADIUS, PALETTE } from '../../constants/designSystem';
+import AppHeader from "../../components/common/AppHeader";
+import ScreenContainer from "../../components/common/ScreenContainer";
+import {
+  DS,
+  EYEBROW,
+  PALETTE,
+  RADIUS,
+  TYPO,
+} from "../../constants/designSystem";
 import {
   createDriverAllocation,
   getCylinderProducts,
-} from '../../services/godownService';
+} from "../../services/godownService";
 
 export default function GodownDriverAllocationScreen() {
   const {
@@ -45,7 +51,10 @@ export default function GodownDriverAllocationScreen() {
   // block a new allocation - they are carried forward and added on top of it.
   const carriedForwardQty = Number(carriedForward || 0);
 
-  const [products, setProducts] = useState<any>({ domestic: [], commercial: [] });
+  const [products, setProducts] = useState<any>({
+    domestic: [],
+    commercial: [],
+  });
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -56,7 +65,7 @@ export default function GodownDriverAllocationScreen() {
       const data = await getCylinderProducts();
       setProducts(data || { domestic: [], commercial: [] });
     } catch (error) {
-      console.log('Products error:', error);
+      console.log("Products error:", error);
     } finally {
       setLoading(false);
     }
@@ -68,14 +77,18 @@ export default function GodownDriverAllocationScreen() {
 
   const allProducts = useMemo(
     () => [...(products.domestic || []), ...(products.commercial || [])],
-    [products]
+    [products],
   );
 
   const total = Object.values(quantities).reduce((sum, item) => sum + item, 0);
 
-  const setQtyFromInput = (productId: number, text: string, available: number) => {
-    const digits = text.replace(/[^0-9]/g, '');
-    const parsed = digits === '' ? 0 : parseInt(digits, 10);
+  const setQtyFromInput = (
+    productId: number,
+    text: string,
+    available: number,
+  ) => {
+    const digits = text.replace(/[^0-9]/g, "");
+    const parsed = digits === "" ? 0 : parseInt(digits, 10);
     const clamped = Math.min(Math.max(0, parsed), Math.max(0, available));
 
     setQuantities((prev) => ({
@@ -102,15 +115,17 @@ export default function GodownDriverAllocationScreen() {
         items,
       });
 
-      DeviceEventEmitter.emit('DRIVER_ALLOCATION_CREATED');
+      DeviceEventEmitter.emit("DRIVER_ALLOCATION_CREATED");
 
-      const carried = Number(result?.data?.carriedForward ?? carriedForwardQty ?? 0);
+      const carried = Number(
+        result?.data?.carriedForward ?? carriedForwardQty ?? 0,
+      );
 
       if (carried > 0) {
         Alert.alert(
-          'Allocation Confirmed',
+          "Allocation Confirmed",
           `${total} cylinder(s) allocated. ${carried} cylinder(s) still in hand from previous day(s) have been carried forward, so the driver now holds ${total + carried} in total.`,
-          [{ text: 'OK', onPress: () => router.back() }]
+          [{ text: "OK", onPress: () => router.back() }],
         );
         return;
       }
@@ -119,9 +134,9 @@ export default function GodownDriverAllocationScreen() {
     } catch (error: any) {
       const message =
         error?.response?.data?.message ||
-        'Failed to create allocation. Please try again.';
-      console.log('Create allocation error:', error?.response?.data || error);
-      Alert.alert('Allocation Failed', message);
+        "Failed to create allocation. Please try again.";
+      console.log("Create allocation error:", error?.response?.data || error);
+      Alert.alert("Allocation Failed", message);
     } finally {
       setSubmitting(false);
     }
@@ -138,7 +153,7 @@ export default function GodownDriverAllocationScreen() {
           </TouchableOpacity>
 
           <View>
-            <Text style={styles.driverName}>{name || 'Driver'}</Text>
+            <Text style={styles.driverName}>{name || "Driver"}</Text>
             <Text style={styles.subText}>{inHand || 0} cylinders in hand</Text>
           </View>
         </View>
@@ -152,8 +167,8 @@ export default function GodownDriverAllocationScreen() {
                 {carriedForwardQty} cylinder(s) carried forward
               </Text>
               <Text style={styles.carryForwardSub}>
-                Not returned on a previous day. They stay with the driver and are
-                added on top of whatever you allocate now.
+                Not returned on a previous day. They stay with the driver and
+                are added on top of whatever you allocate now.
               </Text>
             </View>
           </View>
@@ -177,13 +192,17 @@ export default function GodownDriverAllocationScreen() {
                 key={item.id}
                 item={{
                   id: item.id,
-                  title: item.name || 'Domestic',
-                  subTitle: item.category || '',
+                  title: item.name || "Domestic",
+                  subTitle: item.category || "",
                 }}
                 available={Number(item.availableQuantity || 0)}
                 value={quantities[item.id] || 0}
                 onChangeQty={(text: string) =>
-                  setQtyFromInput(item.id, text, Number(item.availableQuantity || 0))
+                  setQtyFromInput(
+                    item.id,
+                    text,
+                    Number(item.availableQuantity || 0),
+                  )
                 }
               />
             ))}
@@ -195,13 +214,17 @@ export default function GodownDriverAllocationScreen() {
                 key={item.id}
                 item={{
                   id: item.id,
-                  title: item.name || 'Commercial',
-                  subTitle: item.category || '',
+                  title: item.name || "Commercial",
+                  subTitle: item.category || "",
                 }}
                 available={Number(item.availableQuantity || 0)}
                 value={quantities[item.id] || 0}
                 onChangeQty={(text: string) =>
-                  setQtyFromInput(item.id, text, Number(item.availableQuantity || 0))
+                  setQtyFromInput(
+                    item.id,
+                    text,
+                    Number(item.availableQuantity || 0),
+                  )
                 }
               />
             ))}
@@ -212,17 +235,29 @@ export default function GodownDriverAllocationScreen() {
           <Text style={styles.summaryTitle}>DRIVER SUMMARY</Text>
 
           <View style={styles.summaryRow}>
-            <Summary value={allocated || '0'} label="Allocated" color={DS.primary} />
-            <Summary value={delivered || '0'} label="Delivered" color={DS.green} />
-            <Summary value={empty || '0'} label="Empty Collected" color={DS.textPrimary} />
-            <Summary value={inHand || '0'} label="In-Hand" color={DS.orange} />
+            <Summary
+              value={allocated || "0"}
+              label="Allocated"
+              color={DS.primary}
+            />
+            <Summary
+              value={delivered || "0"}
+              label="Delivered"
+              color={DS.green}
+            />
+            <Summary
+              value={empty || "0"}
+              label="Empty Collected"
+              color={DS.textPrimary}
+            />
+            <Summary value={inHand || "0"} label="In-Hand" color={DS.orange} />
           </View>
 
           {carriedForwardQty > 0 ? (
             <Text style={styles.summaryFootnote}>
               Allocated includes {carriedForwardQty} carried forward
-              {allocatedToday ? ` + ${allocatedToday} allocated today` : ''}. This
-              allocation adds {total} more.
+              {allocatedToday ? ` + ${allocatedToday} allocated today` : ""}.
+              This allocation adds {total} more.
             </Text>
           ) : null}
         </View>
@@ -235,7 +270,7 @@ export default function GodownDriverAllocationScreen() {
         >
           <Ionicons name="checkmark" size={18} color={DS.white} />
           <Text style={styles.confirmText}>
-            {submitting ? 'Saving...' : 'Confirm Allocation'}
+            {submitting ? "Saving..." : "Confirm Allocation"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -257,14 +292,19 @@ function CylinderRow({ item, value, available, onChangeQty }: any) {
         <View style={styles.cylinderInfo}>
           <Text style={styles.cylinderTitle}>{item.title}</Text>
           <Text style={styles.cylinderSub}>{item.subTitle}</Text>
-          <Text style={[styles.availableText, outOfStock && styles.availableTextEmpty]}>
+          <Text
+            style={[
+              styles.availableText,
+              outOfStock && styles.availableTextEmpty,
+            ]}
+          >
             Available: {available}
           </Text>
         </View>
 
         <TextInput
           style={[styles.qtyInput, outOfStock && styles.qtyInputDisabled]}
-          value={value ? String(value) : ''}
+          value={value ? String(value) : ""}
           onChangeText={onChangeQty}
           keyboardType="number-pad"
           placeholder="0"
@@ -276,7 +316,9 @@ function CylinderRow({ item, value, available, onChangeQty }: any) {
       </View>
 
       {outOfStock ? (
-        <Text style={styles.qtyHelperError}>Out of stock — cannot allocate</Text>
+        <Text style={styles.qtyHelperError}>
+          Out of stock — cannot allocate
+        </Text>
       ) : atLimit ? (
         <Text style={styles.qtyHelperError}>
           Only {available} available in stock
@@ -297,19 +339,19 @@ function Summary({ value, label, color }: any) {
 
 const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 110 },
-  loaderBox: { height: 220, alignItems: 'center', justifyContent: 'center' },
+  loaderBox: { height: 220, alignItems: "center", justifyContent: "center" },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 16,
     marginBottom: 20,
   },
   driverName: { ...TYPO.s1, color: DS.textPrimary },
   subText: { ...TYPO.c1, color: DS.textSecondary, marginTop: 2 },
   carryForwardCard: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
     backgroundColor: DS.surface,
     borderWidth: 1,
     borderColor: DS.orange,
@@ -325,8 +367,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   allocationHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 12,
   },
   allocationTitle: {
@@ -351,16 +393,16 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   rowTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   iconBox: {
     width: 42,
     height: 42,
     borderRadius: RADIUS.md,
     backgroundColor: DS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   cylinderInfo: { flex: 1 },
@@ -369,7 +411,7 @@ const styles = StyleSheet.create({
   availableText: { ...TYPO.c2, color: DS.primary, marginTop: 4 },
   availableTextEmpty: { color: DS.red },
   qtyInput: {
-    width: 72,
+    width: 100,
     height: 44,
     borderWidth: 1,
     borderColor: DS.border,
@@ -377,7 +419,9 @@ const styles = StyleSheet.create({
     backgroundColor: DS.card,
     color: DS.textPrimary,
     ...TYPO.s1,
+    textAlign: "center",
     paddingVertical: 0,
+    paddingHorizontal: 12,
   },
   qtyInputDisabled: {
     backgroundColor: DS.surface,
@@ -402,28 +446,28 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 16,
   },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  summaryRow: { flexDirection: "row", justifyContent: "space-between" },
   summaryFootnote: {
     ...TYPO.c1,
     color: DS.textSecondary,
     marginTop: 14,
   },
-  summaryItem: { alignItems: 'center', flex: 1 },
+  summaryItem: { alignItems: "center", flex: 1 },
   summaryValue: { ...TYPO.s1 },
   summaryLabel: {
     ...TYPO.c3,
     color: DS.textSecondary,
     marginTop: 4,
-    textAlign: 'center',
+    textAlign: "center",
   },
   confirmButton: {
     height: 52,
     backgroundColor: DS.primary,
     borderRadius: RADIUS.lg,
     marginTop: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 8,
   },
   confirmDisabled: { backgroundColor: PALETTE.primary200 },

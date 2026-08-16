@@ -1,25 +1,31 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   DeviceEventEmitter,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-import AppHeader from '../../components/common/AppHeader';
-import ScreenContainer from '../../components/common/ScreenContainer';
-import { DS, TYPO, EYEBROW, RADIUS, PALETTE, WEIGHT } from '../../constants/designSystem';
-import { useDateRange } from '../../context/DateRangeContext';
+import AppHeader from "../../components/common/AppHeader";
+import ScreenContainer from "../../components/common/ScreenContainer";
+import {
+  DS,
+  EYEBROW,
+  PALETTE,
+  RADIUS,
+  TYPO,
+  WEIGHT,
+} from "../../constants/designSystem";
+import { useDateRange } from "../../context/DateRangeContext";
 import {
   cancelStockOutLoad,
   getStockOutLoadDetail,
-} from '../../services/godownService';
+} from "../../services/godownService";
 
 export default function GodownLoadOutDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +41,7 @@ export default function GodownLoadOutDetailScreen() {
       const data = await getStockOutLoadDetail(id);
       setLoadData(data);
     } catch (error) {
-      console.log('Stock out detail error:', error);
+      console.log("Stock out detail error:", error);
     } finally {
       setLoading(false);
     }
@@ -51,12 +57,12 @@ export default function GodownLoadOutDetailScreen() {
 
       await cancelStockOutLoad(id);
 
-      DeviceEventEmitter.emit('STOCK_OUT_CANCELLED', Number(id));
-      DeviceEventEmitter.emit('NEW_STOCK_OUT');
+      DeviceEventEmitter.emit("STOCK_OUT_CANCELLED", Number(id));
+      DeviceEventEmitter.emit("NEW_STOCK_OUT");
 
       router.back();
     } catch (error: any) {
-      console.log('Cancel stock out error:', error?.response?.data || error);
+      console.log("Cancel stock out error:", error?.response?.data || error);
     } finally {
       setCancelling(false);
     }
@@ -87,7 +93,7 @@ export default function GodownLoadOutDetailScreen() {
   const emptyTotal = Number(loadData.empty_qty || 0);
   const defectiveTotal = Number(loadData.defective_qty || 0);
   const totalQty = Number(loadData.qty || emptyTotal + defectiveTotal);
-  const isCancelled = loadData.status === 'CANCELLED';
+  const isCancelled = loadData.status === "CANCELLED";
 
   return (
     <ScreenContainer>
@@ -105,7 +111,15 @@ export default function GodownLoadOutDetailScreen() {
 
           <View style={styles.titleBox}>
             <Text style={styles.title}>{loadData.load}</Text>
-            <Text style={styles.date}>{loadData.date || '23 Apr 2025'}</Text>
+            <Text style={styles.date}>
+              {loadData.date
+                ? new Date(loadData.date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "N/A"}
+            </Text>
           </View>
 
           <View style={styles.totalBox}>
@@ -115,9 +129,21 @@ export default function GodownLoadOutDetailScreen() {
         </View>
 
         <View style={styles.infoCard}>
-          <InfoRow icon="car-outline" label="VEHICLE" value={loadData.vehicle} />
-          <InfoRow icon="person-outline" label="DRIVER" value={loadData.driver} />
-          <InfoRow icon="cube-outline" label="DEPOT" value={loadData.depot || 'HP Gas Depot - Sector 12'} />
+          <InfoRow
+            icon="car-outline"
+            label="VEHICLE"
+            value={loadData.vehicle}
+          />
+          <InfoRow
+            icon="person-outline"
+            label="DRIVER"
+            value={loadData.driver}
+          />
+          <InfoRow
+            icon="cube-outline"
+            label="DEPOT"
+            value={loadData.depot || "HP Gas Depot - Sector 12"}
+          />
         </View>
 
         <View style={styles.sectionHeader}>
@@ -157,7 +183,9 @@ export default function GodownLoadOutDetailScreen() {
                 <Text style={styles.defectiveTopTitle}>DEFECTIVE ITEMS</Text>
               </View>
 
-              <Text style={styles.defectiveTopTotal}>{defectiveTotal} TOTAL</Text>
+              <Text style={styles.defectiveTopTotal}>
+                {defectiveTotal} TOTAL
+              </Text>
             </View>
 
             <View style={styles.defectiveTableCard}>
@@ -188,7 +216,11 @@ export default function GodownLoadOutDetailScreen() {
         <View style={styles.invoiceCard}>
           <View style={styles.invoiceRow}>
             <View style={styles.invoiceLeft}>
-              <Ionicons name="document-text-outline" size={16} color={DS.textSecondary} />
+              <Ionicons
+                name="document-text-outline"
+                size={16}
+                color={DS.textSecondary}
+              />
               <Text style={styles.invoiceLabel}>Invoice No.</Text>
             </View>
 
@@ -197,15 +229,27 @@ export default function GodownLoadOutDetailScreen() {
 
           <View style={styles.invoiceRow}>
             <View style={styles.invoiceLeft}>
-              <Ionicons name="calendar-outline" size={16} color={DS.textSecondary} />
+              <Ionicons
+                name="calendar-outline"
+                size={16}
+                color={DS.textSecondary}
+              />
               <Text style={styles.invoiceLabel}>Invoice Date</Text>
             </View>
 
-            <Text style={styles.invoiceValue}>{loadData.date || '23 Apr 2025'}</Text>
+            <Text style={styles.invoiceValue}>
+              {loadData.date
+                ? new Date(loadData.date).toLocaleDateString("en-GB", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "N/A"}
+            </Text>
           </View>
         </View>
 
-        <View style={styles.photoHeader}>
+        {/* <View style={styles.photoHeader}>
           <Text style={styles.sectionTitleSmall}>INVOICE PHOTO</Text>
 
           <TouchableOpacity style={styles.downloadPill}>
@@ -219,7 +263,7 @@ export default function GodownLoadOutDetailScreen() {
             uri: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?q=80&w=900&auto=format&fit=crop',
           }}
           style={styles.invoiceImage}
-        />
+        /> */}
       </ScrollView>
 
       <View style={styles.bottomAction}>
@@ -232,7 +276,11 @@ export default function GodownLoadOutDetailScreen() {
           disabled={cancelling || isCancelled}
         >
           <Text style={styles.cancelButtonText}>
-            {isCancelled ? 'Cancelled' : cancelling ? 'Cancelling...' : 'Cancel'}
+            {isCancelled
+              ? "Cancelled"
+              : cancelling
+                ? "Cancelling..."
+                : "Cancel"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -272,8 +320,8 @@ function StockRow({ label, value, danger }: any) {
 const styles = StyleSheet.create({
   loaderBox: {
     height: 400,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   scroll: {
     flex: 1,
@@ -283,8 +331,8 @@ const styles = StyleSheet.create({
     paddingBottom: 170,
   },
   pageHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 18,
   },
   titleBox: {
@@ -301,7 +349,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   totalBox: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
   totalValue: {
     ...TYPO.h5,
@@ -321,8 +369,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 13,
   },
   infoIcon: {
@@ -330,8 +378,8 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: RADIUS.md,
     backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   infoLabel: {
@@ -346,9 +394,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   sectionTitle: {
     ...EYEBROW,
@@ -363,8 +411,8 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   editPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     backgroundColor: DS.surface,
     borderRadius: RADIUS.md,
@@ -380,13 +428,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     borderRadius: RADIUS.md,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginTop: 8,
   },
   tableHead: {
     backgroundColor: DS.surface,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -401,9 +449,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderBottomWidth: 1,
     borderBottomColor: DS.divider,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   stockLabel: {
     ...TYPO.b4,
@@ -419,9 +467,9 @@ const styles = StyleSheet.create({
     minHeight: 52,
     backgroundColor: DS.surface,
     paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   totalRowText: {
     ...TYPO.b4,
@@ -435,13 +483,13 @@ const styles = StyleSheet.create({
   defectiveTopHeader: {
     marginTop: 18,
     marginBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   defectiveTitleLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
   },
   defectiveTopTitle: {
@@ -459,12 +507,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETTE.red100,
     borderRadius: RADIUS.md,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   defectiveTableHead: {
     backgroundColor: DS.redSoft,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
@@ -489,9 +537,9 @@ const styles = StyleSheet.create({
     minHeight: 52,
     backgroundColor: DS.redSoft,
     paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderTopWidth: 1,
     borderColor: PALETTE.red100,
   },
@@ -513,13 +561,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   invoiceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   invoiceLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   invoiceLabel: {
@@ -532,13 +580,13 @@ const styles = StyleSheet.create({
     color: DS.textPrimary,
   },
   photoHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   downloadPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 5,
     backgroundColor: DS.surface,
     borderRadius: RADIUS.md,
@@ -555,7 +603,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   bottomAction: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     right: 0,
     bottom: 72,
@@ -568,8 +616,8 @@ const styles = StyleSheet.create({
     height: 52,
     backgroundColor: DS.red,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   cancelledButtonDisabled: {
     backgroundColor: DS.disabledBg,

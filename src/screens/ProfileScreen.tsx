@@ -1,23 +1,31 @@
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Modal,
   RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-import AppHeader from '../components/common/AppHeader';
-import ScreenContainer from '../components/common/ScreenContainer';
-import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from '../constants/auth';
-import { DS, TYPO, EYEBROW, RADIUS, PALETTE, WEIGHT } from '../constants/designSystem';
-import { useDateRange } from '../context/DateRangeContext';
-import api from '../services/api';
+import AppHeader from "../components/common/AppHeader";
+import ScreenContainer from "../components/common/ScreenContainer";
+import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from "../constants/auth";
+import {
+  DS,
+  EYEBROW,
+  PALETTE,
+  RADIUS,
+  TYPO,
+  WEIGHT,
+} from "../constants/designSystem";
+import { useDateRange } from "../context/DateRangeContext";
+import api from "../services/api";
 
 type DriverProfileDelivery = {
   saleId: number;
@@ -65,10 +73,10 @@ type BookingItem = {
   customerName: string;
   phone: string;
   address: string;
-  status: 'PENDING' | 'ASSIGNED' | 'DELIVERED' | 'CANCELLED';
+  status: "PENDING" | "ASSIGNED" | "DELIVERED" | "CANCELLED";
   totalAmount: number;
   totalQty: number;
-  cylinderType: 'DOMESTIC' | 'COMMERCIAL';
+  cylinderType: "DOMESTIC" | "COMMERCIAL";
   productSummary: string;
   createdAt: string;
   deliveredAt?: string | null;
@@ -84,15 +92,15 @@ type ProfileScreenProps = {
 };
 
 const formatTime = (value?: string | null) => {
-  if (!value) return '';
+  if (!value) return "";
 
   try {
     return new Date(value).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
-    return '';
+    return "";
   }
 };
 
@@ -101,11 +109,11 @@ const formatDateLabel = (dateString: string) => {
     const date = new Date(dateString);
     const today = new Date();
 
-    const formatted = date.toLocaleDateString('en-GB', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
+    const formatted = date.toLocaleDateString("en-GB", {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
     });
 
     if (date.toDateString() === today.toDateString()) {
@@ -119,41 +127,41 @@ const formatDateLabel = (dateString: string) => {
 };
 
 const getPaymentLabel = (mode?: string) => {
-  if (!mode) return 'N/A';
+  if (!mode) return "N/A";
 
   const value = mode.toUpperCase();
 
-  if (value === 'CARD' || value === 'ONLINE') return 'Online';
-  if (value === 'CASH') return 'Cash';
-  if (value === 'UPI') return 'UPI';
-  if (value === 'CREDIT') return 'Credit';
+  if (value === "CARD" || value === "ONLINE") return "Online";
+  if (value === "CASH") return "Cash";
+  if (value === "UPI") return "UPI";
+  if (value === "CREDIT") return "Credit";
 
   return value;
 };
 
 const getInitials = (name?: string) => {
-  if (!name) return 'DR';
+  if (!name) return "DR";
 
   return name
-    .split(' ')
+    .split(" ")
     .map((part) => part[0])
-    .join('')
+    .join("")
     .slice(0, 2)
     .toUpperCase();
 };
 
 const getStatusLabel = (status: string) => {
-  if (status === 'PENDING') return 'Pending';
-  if (status === 'DELIVERED') return 'Delivered';
-  if (status === 'CANCELLED') return 'Cancelled';
+  if (status === "PENDING") return "Pending";
+  if (status === "DELIVERED") return "Delivered";
+  if (status === "CANCELLED") return "Cancelled";
   return status;
 };
 
 export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
   const { rangeKey } = useDateRange();
   const [driverId, setDriverId] = useState<number | null>(null);
-  const [screenMode, setScreenMode] = useState<'PROFILE' | 'BOOKINGS'>(
-    'PROFILE'
+  const [screenMode, setScreenMode] = useState<"PROFILE" | "BOOKINGS">(
+    "PROFILE",
   );
 
   const [data, setData] = useState<DriverProfileResponse | null>(null);
@@ -165,41 +173,44 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
   const [loading, setLoading] = useState(true);
   const [bookingsLoading, setBookingsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [page, setPage] = useState(1);
 
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingItem | null>(
-    null
+    null,
   );
   const [cancelLoading, setCancelLoading] = useState(false);
 
-  const fetchProfileHistory = useCallback(async (pageNumber = 1) => {
-    try {
-      setError('');
+  const fetchProfileHistory = useCallback(
+    async (pageNumber = 1) => {
+      try {
+        setError("");
 
-      if (!driverId) {
-        setError('Driver session not found');
-        return;
+        if (!driverId) {
+          setError("Driver session not found");
+          return;
+        }
+
+        const response = await api.get(
+          `/drivers/${driverId}/profile-history?page=${pageNumber}&limit=4`,
+        );
+
+        if (response.data?.success) {
+          setData(response.data.data);
+        } else {
+          setError("Failed to load profile history");
+        }
+      } catch (err: any) {
+        console.error(
+          "fetchProfileHistory error:",
+          err?.response?.data || err.message,
+        );
+        setError("Failed to load profile history");
       }
-
-      const response = await api.get(
-        `/drivers/${driverId}/profile-history?page=${pageNumber}&limit=4`
-      );
-
-      if (response.data?.success) {
-        setData(response.data.data);
-      } else {
-        setError('Failed to load profile history');
-      }
-    } catch (err: any) {
-      console.error(
-        'fetchProfileHistory error:',
-        err?.response?.data || err.message
-      );
-      setError('Failed to load profile history');
-    }
-  }, [driverId]);
+    },
+    [driverId],
+  );
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -218,7 +229,7 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
         });
       }
     } catch (err: any) {
-      console.error('fetchBookings error:', err?.response?.data || err.message);
+      console.error("fetchBookings error:", err?.response?.data || err.message);
     } finally {
       setBookingsLoading(false);
     }
@@ -234,10 +245,10 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
         if (!Number.isNaN(userId) && userId > 0) {
           setDriverId(userId);
         } else {
-          setError('Driver session not found');
+          setError("Driver session not found");
         }
       } catch {
-        setError('Driver session not found');
+        setError("Driver session not found");
       }
     };
 
@@ -262,13 +273,13 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
   const handleSignOut = async () => {
     await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
     if (onRoleChange) onRoleChange();
-    router.replace('/login');
+    router.replace("/login");
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
 
-    if (screenMode === 'BOOKINGS') {
+    if (screenMode === "BOOKINGS") {
       await fetchBookings();
     } else {
       await Promise.all([fetchProfileHistory(page), fetchBookings()]);
@@ -278,7 +289,7 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
   };
 
   const openBookings = async () => {
-    setScreenMode('BOOKINGS');
+    setScreenMode("BOOKINGS");
     await fetchBookings();
   };
 
@@ -297,7 +308,7 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
         `/drivers/bookings/${selectedBooking.saleId}/cancel`,
         {
           driver_id: driverId,
-        }
+        },
       );
 
       if (response.data?.success) {
@@ -306,13 +317,13 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
         await fetchBookings();
       }
     } catch (err: any) {
-      console.error('cancelBooking error:', err?.response?.data || err.message);
+      console.error("cancelBooking error:", err?.response?.data || err.message);
     } finally {
       setCancelLoading(false);
     }
   };
 
-  if (screenMode === 'BOOKINGS') {
+  if (screenMode === "BOOKINGS") {
     return (
       <ScreenContainer
         refreshControl={
@@ -325,13 +336,9 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
           <View style={styles.bookingHeaderRow}>
             <TouchableOpacity
               style={styles.backSquare}
-              onPress={() => setScreenMode('PROFILE')}
+              onPress={() => setScreenMode("PROFILE")}
             >
-              <Ionicons
-                name="arrow-back"
-                size={28}
-                color={DS.textPrimary}
-              />
+              <Ionicons name="arrow-back" size={28} color={DS.textPrimary} />
             </TouchableOpacity>
 
             <View>
@@ -382,10 +389,6 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
       <AppHeader />
 
       <View style={styles.content}>
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutButtonText}>Sign Out</Text>
-        </TouchableOpacity>
-
         {loading ? (
           <View style={styles.centerBox}>
             <ActivityIndicator size="large" color={DS.primary} />
@@ -398,44 +401,69 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
         ) : (
           <>
             <View style={styles.profileCard}>
-              <View style={styles.profileAvatar}>
-                <Text style={styles.profileInitials}>
-                  {getInitials(data?.driver?.name)}
-                </Text>
-              </View>
-
-              <View style={styles.profileInfo}>
-                <Text style={styles.profileName}>
-                  {data?.driver?.name || 'Driver'}
-                </Text>
-
-                <View style={styles.profileMetaRow}>
-                  <Ionicons
-                    name="call-outline"
-                    size={18}
-                    color={DS.textSecondary}
+              <View style={styles.profileTopRow}>
+                <View style={styles.profileAvatar}>
+                  <Image
+                    source={require("../../assets/images/driverimage.jpeg")}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      borderRadius: RADIUS.xxl,
+                    }}
                   />
-                  <Text style={styles.profileMeta}>
-                    {data?.driver?.phone || 'N/A'}
-                  </Text>
                 </View>
 
-                <View style={styles.profileMetaRow}>
-                  <Ionicons
-                    name="car-outline"
-                    size={18}
-                    color={DS.textSecondary}
-                  />
-                  <Text style={styles.profileMeta}>
-                    {data?.driver?.vehicleNumber || 'N/A'}
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName}>
+                    {data?.driver?.name || "Driver"}
                   </Text>
+
+                  <View style={styles.profileMetaRow}>
+                    <Ionicons
+                      name="briefcase-outline"
+                      size={18}
+                      color={DS.textSecondary}
+                    />
+                    <Text style={styles.profileMeta}>
+                      Delivery Driver
+                    </Text>
+                  </View>
+
+                  <View style={styles.profileMetaRow}>
+                    <Ionicons
+                      name="call-outline"
+                      size={18}
+                      color={DS.textSecondary}
+                    />
+                    <Text style={styles.profileMeta}>
+                      {data?.driver?.phone || "N/A"}
+                    </Text>
+                  </View>
+
+                  <View style={styles.profileMetaRow}>
+                    <Ionicons
+                      name="car-outline"
+                      size={18}
+                      color={DS.textSecondary}
+                    />
+                    <Text style={styles.profileMeta}>
+                      {data?.driver?.vehicleNumber || "N/A"}
+                    </Text>
+                  </View>
                 </View>
               </View>
+
+              <TouchableOpacity
+                style={styles.signOutButton}
+                onPress={handleSignOut}
+              >
+                <Text style={styles.signOutButtonText}>Sign Out</Text>
+              </TouchableOpacity>
             </View>
 
-            <Text style={styles.sectionTitle}>PERFORMANCE</Text>
+            {/* <Text style={styles.sectionTitle}>PERFORMANCE</Text> */}
 
-            <View style={styles.performanceWrapVertical}>
+            {/* <View style={styles.performanceWrapVertical}>
               <PerformanceRow
                 icon="checkmark-circle-outline"
                 label="Today"
@@ -459,7 +487,7 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
                 color={DS.orangeText}
                 bg={DS.orangeSoft}
               />
-            </View>
+            </View> */}
 
             <TouchableOpacity
               activeOpacity={0.85}
@@ -468,10 +496,13 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
             >
               <View style={styles.myBookingLeft}>
                 <View style={styles.myBookingIcon}>
-                  <Ionicons
-                    name="clipboard-outline"
-                    size={30}
-                    color={DS.primary}
+                  <Image
+                    source={require("../../assets/images/Cylinder.png")}
+                    style={{
+                      width: "80%",
+                      height: "100%",
+                      borderRadius: RADIUS.lg,
+                    }}
                   />
                 </View>
 
@@ -512,7 +543,7 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
 
                     <View style={styles.dayRight}>
                       <Text style={styles.dayAmount}>
-                        ₹{dayItem.totalAmount.toLocaleString('en-IN')}
+                        ₹{dayItem.totalAmount.toLocaleString("en-IN")}
                       </Text>
                       <Text style={styles.dayDeliveries}>
                         {dayItem.totalDeliveries} deliveries
@@ -522,7 +553,7 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
 
                   {dayItem.deliveries.map((item) => {
                     const paymentLabel = getPaymentLabel(item.paymentMode);
-                    const isCommercial = item.cylinderType === 'COMMERCIAL';
+                    const isCommercial = item.cylinderType === "COMMERCIAL";
 
                     return (
                       <View key={item.saleId} style={styles.deliveryRow}>
@@ -537,12 +568,16 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
                               },
                             ]}
                           >
-                            <Ionicons
-                              name="cube-outline"
-                              size={20}
-                              color={
-                                isCommercial ? DS.orange : DS.primary
-                              }
+                            <Image
+                              source={require("../../assets/images/Cylinder.png")}
+                              style={{
+                                width: 24,
+                                height: 24,
+                                tintColor: isCommercial
+                                  ? DS.orange
+                                  : DS.primary,
+                              }}
+                              resizeMode="contain"
                             />
                           </View>
 
@@ -556,7 +591,7 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
                             </Text>
 
                             <Text style={styles.subMetaText}>
-                              {isCommercial ? 'Commercial' : 'Domestic'} ×{' '}
+                              {isCommercial ? "Commercial" : "Domestic"} ×{" "}
                               {item.quantity}
                             </Text>
                           </View>
@@ -564,31 +599,31 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
 
                         <View style={styles.rowRight}>
                           <Text style={styles.amountText}>
-                            ₹{item.totalAmount.toLocaleString('en-IN')}
+                            ₹{item.totalAmount.toLocaleString("en-IN")}
                           </Text>
 
                           <View
                             style={[
                               styles.paymentBadge,
-                              paymentLabel === 'Cash'
+                              paymentLabel === "Cash"
                                 ? styles.cashBadge
-                                : paymentLabel === 'UPI'
-                                ? styles.upiBadge
-                                : paymentLabel === 'Credit'
-                                ? styles.creditBadge
-                                : styles.onlineBadge,
+                                : paymentLabel === "UPI"
+                                  ? styles.upiBadge
+                                  : paymentLabel === "Credit"
+                                    ? styles.creditBadge
+                                    : styles.onlineBadge,
                             ]}
                           >
                             <Text
                               style={[
                                 styles.paymentBadgeText,
-                                paymentLabel === 'Cash'
+                                paymentLabel === "Cash"
                                   ? styles.cashText
-                                  : paymentLabel === 'UPI'
-                                  ? styles.upiText
-                                  : paymentLabel === 'Credit'
-                                  ? styles.creditText
-                                  : styles.onlineText,
+                                  : paymentLabel === "UPI"
+                                    ? styles.upiText
+                                    : paymentLabel === "Credit"
+                                      ? styles.creditText
+                                      : styles.onlineText,
                               ]}
                             >
                               {paymentLabel}
@@ -624,7 +659,7 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
               </TouchableOpacity>
 
               <Text style={styles.pageIndicator}>
-                Page {data?.pagination?.page || 1} of{' '}
+                Page {data?.pagination?.page || 1} of{" "}
                 {data?.pagination?.totalPages || 1}
               </Text>
 
@@ -658,9 +693,9 @@ function BookingCard({
   item: BookingItem;
   onCancel: () => void;
 }) {
-  const isPending = item.status === 'PENDING';
-  const isDelivered = item.status === 'DELIVERED';
-  const isCommercial = item.cylinderType === 'COMMERCIAL';
+  const isPending = item.status === "PENDING";
+  const isDelivered = item.status === "DELIVERED";
+  const isCommercial = item.cylinderType === "COMMERCIAL";
 
   return (
     <View style={styles.bookingCard}>
@@ -697,10 +732,10 @@ function BookingCard({
           </View>
 
           <Text style={styles.bookingProduct}>
-            {isCommercial ? 'Commercial' : 'Domestic'} × {item.totalQty}
+            {isCommercial ? "Commercial" : "Domestic"} × {item.totalQty}
             {isDelivered && item.deliveredAt
               ? `  ◷ ${formatTime(item.deliveredAt)}`
-              : ''}
+              : ""}
           </Text>
         </View>
 
@@ -711,8 +746,8 @@ function BookingCard({
               isPending
                 ? styles.pendingBadge
                 : isDelivered
-                ? styles.deliveredBadge
-                : styles.cancelledBadge,
+                  ? styles.deliveredBadge
+                  : styles.cancelledBadge,
             ]}
           >
             <Text
@@ -721,8 +756,8 @@ function BookingCard({
                 isPending
                   ? styles.pendingText
                   : isDelivered
-                  ? styles.deliveredText
-                  : styles.cancelledText,
+                    ? styles.deliveredText
+                    : styles.cancelledText,
               ]}
             >
               {getStatusLabel(item.status)}
@@ -730,14 +765,14 @@ function BookingCard({
           </View>
 
           <Text style={styles.bookingAmount}>
-            ₹{item.totalAmount.toLocaleString('en-IN')}
+            ₹{item.totalAmount.toLocaleString("en-IN")}
           </Text>
         </View>
       </View>
 
       {isPending ? (
         <TouchableOpacity style={styles.cancelBookingButton} onPress={onCancel}>
-          <Text style={styles.cancelBookingText}>×  Cancel Booking</Text>
+          <Text style={styles.cancelBookingText}>× Cancel Booking</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -826,8 +861,8 @@ const styles = StyleSheet.create({
   },
 
   roleSwitchWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
     marginBottom: 18,
   },
@@ -837,9 +872,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETTE.red100,
     backgroundColor: DS.redSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+    width: "100%",
   },
   signOutButtonText: {
     ...TYPO.b4,
@@ -849,14 +885,14 @@ const styles = StyleSheet.create({
 
   roleButton: {
     flexGrow: 1,
-    flexBasis: '30%',
+    flexBasis: "30%",
     height: 54,
     backgroundColor: DS.card,
     borderWidth: 1,
     borderColor: DS.border,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   roleButtonActive: {
@@ -868,7 +904,7 @@ const styles = StyleSheet.create({
     ...TYPO.b4,
     fontWeight: WEIGHT.semibold,
     color: DS.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   roleButtonTextActive: {
@@ -881,9 +917,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
     marginBottom: 22,
+  },
+
+  profileTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   profileAvatar: {
@@ -891,8 +930,8 @@ const styles = StyleSheet.create({
     height: 74,
     borderRadius: RADIUS.xxl,
     backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 18,
   },
 
@@ -912,8 +951,8 @@ const styles = StyleSheet.create({
   },
 
   profileMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 6,
     marginTop: 4,
   },
@@ -941,14 +980,14 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     paddingHorizontal: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
 
   performanceRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 14,
   },
 
@@ -956,8 +995,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   performanceRowLabel: {
@@ -976,25 +1015,25 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: 18,
     marginBottom: 26,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
 
   myBookingLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 16,
     flex: 1,
   },
 
   myBookingIcon: {
-    width: 64,
-    height: 64,
+    width: 72,
+    height: 72,
     borderRadius: RADIUS.lg,
-    backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    // backgroundColor: DS.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   myBookingTitle: {
@@ -1009,8 +1048,8 @@ const styles = StyleSheet.create({
   },
 
   myBookingRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
 
@@ -1029,15 +1068,15 @@ const styles = StyleSheet.create({
   },
 
   dayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 12,
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
 
   dayLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     flex: 1,
   },
@@ -1048,7 +1087,7 @@ const styles = StyleSheet.create({
   },
 
   dayRight: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
   },
 
   dayAmount: {
@@ -1067,13 +1106,13 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     padding: 12,
     marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
   },
 
   rowLeft: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     flex: 1,
   },
@@ -1086,8 +1125,8 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: RADIUS.md,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   customerName: {
@@ -1108,7 +1147,7 @@ const styles = StyleSheet.create({
   },
 
   rowRight: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     marginLeft: 10,
   },
 
@@ -1162,9 +1201,9 @@ const styles = StyleSheet.create({
   },
 
   paginationWrap: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     backgroundColor: DS.card,
     borderWidth: 1,
     borderColor: DS.border,
@@ -1178,9 +1217,9 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: RADIUS.md,
     backgroundColor: DS.surface,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     gap: 4,
   },
 
@@ -1201,8 +1240,8 @@ const styles = StyleSheet.create({
   },
 
   bookingHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 18,
     marginBottom: 28,
   },
@@ -1213,8 +1252,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: DS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: DS.card,
   },
 
@@ -1239,16 +1278,16 @@ const styles = StyleSheet.create({
   },
 
   bookingTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
   },
 
   bookingIcon: {
     width: 58,
     height: 58,
     borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 14,
   },
 
@@ -1262,8 +1301,8 @@ const styles = StyleSheet.create({
   },
 
   bookingAddressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 4,
     marginTop: 6,
   },
@@ -1282,7 +1321,7 @@ const styles = StyleSheet.create({
   },
 
   bookingRight: {
-    alignItems: 'flex-end',
+    alignItems: "flex-end",
     marginLeft: 10,
   },
 
@@ -1333,8 +1372,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PALETTE.red100,
     backgroundColor: DS.redSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 20,
   },
 
@@ -1345,8 +1384,8 @@ const styles = StyleSheet.create({
 
   cancelOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(11,13,18,0.55)',
-    justifyContent: 'center',
+    backgroundColor: "rgba(11,13,18,0.55)",
+    justifyContent: "center",
   },
 
   cancelModalBox: {
@@ -1357,13 +1396,13 @@ const styles = StyleSheet.create({
   cancelTitle: {
     ...TYPO.h5,
     color: DS.textPrimary,
-    textAlign: 'center',
+    textAlign: "center",
   },
 
   cancelDescription: {
     ...TYPO.b1,
     color: DS.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
     marginTop: 20,
     marginBottom: 28,
   },
@@ -1372,8 +1411,8 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: RADIUS.lg,
     backgroundColor: DS.red,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 14,
   },
 
@@ -1387,8 +1426,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: DS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   keepBookingText: {
@@ -1402,7 +1441,7 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
     borderRadius: RADIUS.lg,
     paddingVertical: 30,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 16,
   },
 
@@ -1413,8 +1452,8 @@ const styles = StyleSheet.create({
 
   centerBox: {
     paddingVertical: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   infoText: {

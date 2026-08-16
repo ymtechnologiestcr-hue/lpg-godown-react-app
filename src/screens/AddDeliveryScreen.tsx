@@ -1,6 +1,7 @@
 // src/screens/AddDeliveryScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Location from "expo-location";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -17,7 +18,7 @@ import {
 import AppHeader from "../components/common/AppHeader";
 import ScreenContainer from "../components/common/ScreenContainer";
 import { AUTH_USER_KEY } from "../constants/auth";
-import { DS, TYPO, EYEBROW, RADIUS, PALETTE } from '../constants/designSystem';
+import { DS, EYEBROW, PALETTE, RADIUS, TYPO } from "../constants/designSystem";
 import api from "../services/api";
 
 type Customer = {
@@ -49,13 +50,25 @@ export default function AddDeliveryScreen() {
   const [checkingCustomer, setCheckingCustomer] = useState(false);
   const [customerExists, setCustomerExists] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
+    null,
   );
 
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [geoLocationTag, setGeoLocationTag] = useState("");
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 20.5937, // Default center on India
+    longitude: 78.9629,
+    latitudeDelta: 10.0,
+    longitudeDelta: 10.0,
+  });
+  const [markerCoordinate, setMarkerCoordinate] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   const [products, setProducts] = useState<BookingItem[]>([]);
   const [productLoading, setProductLoading] = useState(false);
@@ -90,7 +103,7 @@ export default function AddDeliveryScreen() {
       setCheckingCustomer(true);
 
       const response = await api.get(
-        `/drivers/bookings/customer?phone=${encodeURIComponent(cleanPhone)}`
+        `/drivers/bookings/customer?phone=${encodeURIComponent(cleanPhone)}`,
       );
 
       if (response.data?.success) {
@@ -118,7 +131,7 @@ export default function AddDeliveryScreen() {
     } catch (err: any) {
       Alert.alert(
         "Error",
-        err?.response?.data?.message || "Failed to find customer"
+        err?.response?.data?.message || "Failed to find customer",
       );
     } finally {
       setCheckingCustomer(false);
@@ -189,10 +202,82 @@ export default function AddDeliveryScreen() {
     } catch (err: any) {
       Alert.alert(
         "Error",
-        err?.response?.data?.message || "Failed to create customer"
+        err?.response?.data?.message || "Failed to create customer",
       );
     } finally {
       setCreatingCustomer(false);
+    }
+  };
+
+  const handleTagLocation = async () => {
+    try {
+      setIsFetchingLocation(true);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission denied",
+          "Permission to access location was denied",
+        );
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=AIzaSyBmrEg7SfI6pHlfcoAhOBG5GbHXxFz9pqk`,
+      );
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        setGeoLocationTag(data.results[0].formatted_address);
+        setAddress(data.results[0].formatted_address);
+      } else {
+        const coords = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        setGeoLocationTag(coords);
+        setAddress(coords);
+      }
+
+      setMapRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      });
+      setMarkerCoordinate({ latitude, longitude });
+      setShowMap(true);
+    } catch (error) {
+      Alert.alert("Error", "Failed to fetch location");
+      setGeoLocationTag("Location Error");
+    } finally {
+      setIsFetchingLocation(false);
+    }
+  };
+
+  const handleMapPress = async (event: any) => {
+    const { coordinate } = event.nativeEvent;
+    if (!coordinate) return;
+
+    setMarkerCoordinate(coordinate);
+    try {
+      setIsFetchingLocation(true);
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=AIzaSyBmrEg7SfI6pHlfcoAhOBG5GbHXxFz9pqk`,
+      );
+      const data = await response.json();
+
+      if (data.results && data.results.length > 0) {
+        setGeoLocationTag(data.results[0].formatted_address);
+        setAddress(data.results[0].formatted_address);
+      } else {
+        const coords = `${coordinate.latitude.toFixed(5)}, ${coordinate.longitude.toFixed(5)}`;
+        setGeoLocationTag(coords);
+        setAddress(coords);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to fetch address for selected location");
+    } finally {
+      setIsFetchingLocation(false);
     }
   };
 
@@ -201,7 +286,7 @@ export default function AddDeliveryScreen() {
       setProductLoading(true);
 
       const response = await api.get(
-        `/drivers/products/search?type=COMMERCIAL&search=`
+        `/drivers/products/search?type=COMMERCIAL&search=`,
       );
 
       if (response.data?.success) {
@@ -217,7 +302,7 @@ export default function AddDeliveryScreen() {
     } catch (err: any) {
       Alert.alert(
         "Error",
-        err?.response?.data?.message || "Failed to fetch commercial products"
+        err?.response?.data?.message || "Failed to fetch commercial products",
       );
       setProducts([]);
     } finally {
@@ -237,7 +322,7 @@ export default function AddDeliveryScreen() {
               ? item.qty + 1
               : Math.max(Number(item.qty || 0) - 1, 0),
         };
-      })
+      }),
     );
   };
 
@@ -247,7 +332,7 @@ export default function AddDeliveryScreen() {
 
   const totalAmount = selectedItems.reduce(
     (sum, item) => sum + item.qty * Number(item.price || 0),
-    0
+    0,
   );
 
   const canConfirmBooking = selectedCustomer && selectedItems.length > 0;
@@ -303,7 +388,7 @@ export default function AddDeliveryScreen() {
     } catch (err: any) {
       Alert.alert(
         "Error",
-        err?.response?.data?.message || "Failed to create booking"
+        err?.response?.data?.message || "Failed to create booking",
       );
     } finally {
       setCreatingBooking(false);
@@ -360,7 +445,9 @@ export default function AddDeliveryScreen() {
                 ]}
               >
                 <Ionicons
-                  name={customerExists ? "person-add-outline" : "person-add-outline"}
+                  name={
+                    customerExists ? "person-add-outline" : "person-add-outline"
+                  }
                   size={28}
                   color={customerExists ? DS.green : DS.primary}
                 />
@@ -400,11 +487,7 @@ export default function AddDeliveryScreen() {
                 style={styles.backSquare}
                 onPress={() => setStep(1)}
               >
-                <Ionicons
-                  name="arrow-back"
-                  size={28}
-                  color={DS.textPrimary}
-                />
+                <Ionicons name="arrow-back" size={28} color={DS.textPrimary} />
               </TouchableOpacity>
 
               <View>
@@ -434,15 +517,22 @@ export default function AddDeliveryScreen() {
             <Text style={styles.inputLabel}>Geo-Location Tag</Text>
             <TouchableOpacity
               style={styles.locationButton}
-              onPress={() => setGeoLocationTag("Current Location Tagged")}
+              onPress={handleTagLocation}
+              disabled={isFetchingLocation}
             >
-              <Ionicons
-                name="location-outline"
-                size={28}
-                color={DS.textPrimary}
-              />
-              <Text style={styles.locationButtonText}>
-                {geoLocationTag || "Tag Current Location"}
+              {isFetchingLocation ? (
+                <ActivityIndicator color={DS.primary} />
+              ) : (
+                <Ionicons
+                  name="location-outline"
+                  size={28}
+                  color={DS.textPrimary}
+                />
+              )}
+              <Text style={styles.locationButtonText} numberOfLines={2}>
+                {isFetchingLocation
+                  ? "Fetching location..."
+                  : geoLocationTag || "Tag Current Location"}
               </Text>
             </TouchableOpacity>
 
@@ -476,11 +566,7 @@ export default function AddDeliveryScreen() {
                   }
                 }}
               >
-                <Ionicons
-                  name="arrow-back"
-                  size={28}
-                  color={DS.textPrimary}
-                />
+                <Ionicons name="arrow-back" size={28} color={DS.textPrimary} />
               </TouchableOpacity>
 
               <View>
@@ -537,7 +623,9 @@ export default function AddDeliveryScreen() {
 
             <View style={styles.totalBox}>
               <Text style={styles.totalLabel}>Total ({totalQty} cyl)</Text>
-              <Text style={styles.totalAmount}>₹{totalAmount.toLocaleString("en-IN")}</Text>
+              <Text style={styles.totalAmount}>
+                ₹{totalAmount.toLocaleString("en-IN")}
+              </Text>
             </View>
 
             <TouchableOpacity
@@ -568,7 +656,8 @@ export default function AddDeliveryScreen() {
           <View style={styles.cancelBox}>
             <Text style={styles.cancelTitle}>Cancel this booking?</Text>
             <Text style={styles.cancelText}>
-              This action cannot be undone. The booking will be marked as cancelled.
+              This action cannot be undone. The booking will be marked as
+              cancelled.
             </Text>
 
             <TouchableOpacity
@@ -909,10 +998,57 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 14,
   },
-
   cancelConfirmText: {
     ...TYPO.s2,
     color: DS.white,
+  },
+  showMapButton: {
+    marginTop: 10,
+    paddingVertical: 10,
+    alignItems: "center",
+    backgroundColor: DS.card,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: DS.border,
+  },
+  showMapButtonText: {
+    ...TYPO.c1,
+    color: DS.primary,
+    fontWeight: "bold",
+  },
+  mapCard: {
+    marginTop: 12,
+    borderRadius: RADIUS.lg,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: DS.border,
+    backgroundColor: DS.card,
+  },
+  mapHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: DS.border,
+  },
+  mapTitle: {
+    ...TYPO.s2,
+    color: DS.textPrimary,
+  },
+  closeMapText: {
+    ...TYPO.c2,
+    color: DS.textSecondary,
+  },
+  map: {
+    width: "100%",
+    height: 250,
+  },
+  mapHelpText: {
+    ...TYPO.c2,
+    color: DS.textSecondary,
+    textAlign: "center",
+    padding: 10,
   },
 
   keepButton: {

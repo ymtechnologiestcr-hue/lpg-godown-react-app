@@ -14,13 +14,13 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://lpg-backend-001-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://enthusiastic-simplicity-production-b3db.up.railway.app/api"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_BASE_URL": "https://lpg-backend-001-production.up.railway.app/api"
+        "EXPO_PUBLIC_API_BASE_URL": "https://enthusiastic-simplicity-production-b3db.up.railway.app/api"
       }
     }
   },

@@ -48,45 +48,15 @@ export default function CashDenominationModal({
   onClose,
   onSubmit,
 }: Props) {
-  const [values, setValues] = useState<Denominations>(initialValues);
+  const [enteredAmountText, setEnteredAmountText] = useState("");
 
   useEffect(() => {
     if (visible) {
-      setValues(initialValues);
+      setEnteredAmountText("");
     }
   }, [visible]);
 
-  const enteredAmount = useMemo(() => {
-    return (
-      values["500"] * 500 +
-      values["100"] * 100 +
-      values["50"] * 50 +
-      values["20"] * 20 +
-      values["10"] * 10 +
-      values.coins
-    );
-  }, [values]);
-
-  const updateCount = (key: keyof Denominations, next: number) => {
-    setValues((prev) => ({
-      ...prev,
-      [key]: Math.max(0, next),
-    }));
-  };
-
-  const rows: Array<{ key: keyof Denominations; label: string }> = [
-    { key: "500", label: "₹500" },
-    { key: "100", label: "₹100" },
-    { key: "50", label: "₹50" },
-    { key: "20", label: "₹20" },
-    { key: "10", label: "₹10" },
-    { key: "coins", label: "Coins" },
-  ];
-
-  const renderAmount = (key: keyof Denominations) => {
-    if (key === 'coins') return values.coins;
-    return Number(key) * values[key];
-  };
+  const enteredAmount = Number(enteredAmountText) || 0;
 
   return (
     <Modal
@@ -107,51 +77,27 @@ export default function CashDenominationModal({
               </View>
 
               <Text style={styles.subtitle}>
-                Enter the count of each denomination to settle cash collection.
+                Enter the total cash amount collected.
               </Text>
 
-              {rows.map((row) => (
-                <View key={row.key} style={styles.row}>
-                  <Text style={styles.label}>{row.label}</Text>
-
-                  <View style={styles.counterWrap}>
-                    <TouchableOpacity
-                      style={styles.counterBtn}
-                      onPress={() => updateCount(row.key, values[row.key] - 1)}
-                    >
-                      <Text style={styles.counterBtnText}>-</Text>
-                    </TouchableOpacity>
-
-                    <TextInput
-                      style={styles.input}
-                      keyboardType="numeric"
-                      value={String(values[row.key])}
-                      onChangeText={(text) =>
-                        updateCount(row.key, Number(text || 0))
-                      }
-                    />
-
-                    <TouchableOpacity
-                      style={styles.counterBtn}
-                      onPress={() => updateCount(row.key, values[row.key] + 1)}
-                    >
-                      <Text style={styles.counterBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <Text style={styles.rowAmount}>₹{renderAmount(row.key)}</Text>
-                </View>
-              ))}
+              <TextInput
+                style={styles.amountInput}
+                keyboardType="numeric"
+                value={enteredAmountText}
+                onChangeText={setEnteredAmountText}
+                placeholder="Enter amount"
+                placeholderTextColor={DS.textTertiary}
+              />
 
               <View style={styles.summaryBox}>
-                <Text style={styles.expectedText}>Expected: ₹{expectedAmount}</Text>
+                <Text style={styles.expectedText}>Expected: ₹{Number(expectedAmount.toFixed(2))}</Text>
                 <Text style={styles.enteredText}>Entered: ₹{enteredAmount}</Text>
               </View>
 
               <TouchableOpacity
                 style={[styles.submitBtn, loading && styles.disabled]}
                 disabled={loading}
-                onPress={() => onSubmit({ denominations: values, enteredAmount })}
+                onPress={() => onSubmit({ denominations: initialValues, enteredAmount })}
               >
                 {loading ? (
                   <ActivityIndicator color={DS.white} />
@@ -211,57 +157,22 @@ const styles = StyleSheet.create({
     ...TYPO.s2,
     color: DS.primary,
   },
+  amountInput: {
+    height: 50,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: DS.border,
+    paddingHorizontal: 16,
+    ...TYPO.h5,
+    color: DS.textPrimary,
+    backgroundColor: DS.card,
+    marginBottom: 20,
+  },
   subtitle: {
     ...TYPO.c1,
     color: DS.textSecondary,
     marginTop: 10,
     marginBottom: 14,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  label: {
-    width: 60,
-    ...TYPO.s2,
-    color: DS.textPrimary,
-  },
-  counterWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  counterBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: RADIUS.sm,
-    backgroundColor: DS.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  counterBtnText: {
-    ...TYPO.s1,
-    color: DS.textPrimary,
-  },
-  input: {
-    width: 54,
-    height: 34,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: DS.border,
-    textAlign: 'center',
-    ...TYPO.s2,
-    color: DS.textPrimary,
-    backgroundColor: DS.card,
-  },
-  rowAmount: {
-    width: 56,
-    textAlign: 'right',
-    ...TYPO.b4,
-    color: DS.textSecondary,
   },
   summaryBox: {
     marginTop: 4,

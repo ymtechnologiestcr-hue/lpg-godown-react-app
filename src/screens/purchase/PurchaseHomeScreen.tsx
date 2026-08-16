@@ -19,6 +19,8 @@ import {
   getPurchaseDashboard,
 } from '../../services/purchaseService';
 import type { PurchaseBootstrap, PurchaseDashboard } from '../../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AUTH_USER_KEY } from '../../constants/auth';
 
 const formatCurrency = (value: number) => `₹${value.toLocaleString('en-IN')}`;
 
@@ -37,6 +39,7 @@ const getStatusColors = (status: string) => {
 export default function PurchaseHomeScreen() {
   const [bootstrap, setBootstrap] = useState<PurchaseBootstrap | null>(null);
   const [dashboard, setDashboard] = useState<PurchaseDashboard | null>(null);
+  const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -64,6 +67,12 @@ export default function PurchaseHomeScreen() {
   useEffect(() => {
     fetchData();
 
+    AsyncStorage.getItem(AUTH_USER_KEY).then((data) => {
+      if (data) {
+        setUser(JSON.parse(data));
+      }
+    });
+
     const subscription = DeviceEventEmitter.addListener(
       'PURCHASE_FLOW_UPDATED',
       () => fetchData(true)
@@ -90,8 +99,10 @@ export default function PurchaseHomeScreen() {
           <View style={styles.heroTopRow}>
             <View>
               <Text style={styles.welcome}>WELCOME BACK</Text>
-              <Text style={styles.name}>{bootstrap?.manager.name ?? 'Purchase Manager'}</Text>
-              <Text style={styles.vehicle}>{bootstrap?.manager.vehicleLabel ?? 'Purchase Manager Vehicle'}</Text>
+              <Text style={styles.name}>{user?.name ?? bootstrap?.manager.name ?? 'Purchase Manager'}</Text>
+              {user?.vehicleNumber ? (
+                <Text style={styles.vehicle}>{user.vehicleNumber}</Text>
+              ) : null}
             </View>
 
             <TouchableOpacity activeOpacity={0.8} style={styles.bellButton}>

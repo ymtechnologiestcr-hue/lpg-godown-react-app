@@ -10,6 +10,7 @@ import { DS, TYPO, RADIUS, PALETTE } from '../../constants/designSystem';
 
 type Props = {
   name: string;
+  consumerNumber?: string | null;
   address: string;
   type: string;
   qty: number;
@@ -21,6 +22,7 @@ type Props = {
 
 export default function DeliveryCard({
   name,
+  consumerNumber,
   address,
   type,
   qty,
@@ -37,6 +39,12 @@ export default function DeliveryCard({
       <View style={styles.rowTop}>
         <View style={styles.infoWrap}>
           <Text style={styles.name}>{name}</Text>
+
+          {consumerNumber ? (
+            <View style={styles.consumerNumberRow}>
+              <Text style={styles.consumerNumberText}>Consumer No: {consumerNumber}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.addressRow}>
             <Ionicons name="location-outline" size={14} color={DS.textSecondary} />
@@ -113,7 +121,15 @@ const styles = StyleSheet.create({
   name: {
     ...TYPO.s1,
     color: DS.textPrimary,
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  consumerNumberRow: {
+    marginBottom: 6,
+  },
+  consumerNumberText: {
+    ...TYPO.b3,
+    color: PALETTE.blue600,
+    fontWeight: '500',
   },
   addressRow: {
     flexDirection: 'row',

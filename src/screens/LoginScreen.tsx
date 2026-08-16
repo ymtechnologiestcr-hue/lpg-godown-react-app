@@ -219,82 +219,94 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: DS.background,
+    backgroundColor: '#1E65FF', // Matching welcome screen blue
     justifyContent: 'center',
-    padding: 18,
+    padding: 24,
   },
   card: {
     backgroundColor: DS.card,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: DS.border,
-    padding: 18,
+    borderRadius: RADIUS.xl, // Softer, larger radius
+    padding: 28, // More spacious padding inside the card
+    transform: [{ translateY: -60 }], // Place 60px above current center position
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
+    elevation: 12,
+    borderWidth: 0, // Clean borderless look
   },
   title: {
     ...TYPO.h5,
     color: DS.textPrimary,
+    marginBottom: 4,
   },
   subtitle: {
     ...TYPO.b3,
-    marginTop: 4,
-    marginBottom: 18,
+    marginBottom: 24,
     color: DS.textSecondary,
   },
   label: {
     ...TYPO.c2,
     color: DS.textSecondary,
-    marginBottom: 6,
+    marginBottom: 8,
   },
   input: {
-    height: 48,
-    borderRadius: RADIUS.sm,
+    height: 52, // Slightly taller input for professional look
+    borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: DS.border,
+    borderColor: DS.borderStrong,
     backgroundColor: DS.surface,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     fontSize: 15,
     fontWeight: WEIGHT.medium,
     color: DS.textPrimary,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   info: {
     ...TYPO.c1,
     color: DS.textSecondary,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   button: {
-    height: 46,
-    borderRadius: RADIUS.sm,
+    height: 52, // Taller button
+    borderRadius: RADIUS.md,
     backgroundColor: DS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 8,
+    shadowColor: DS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonText: {
-    ...TYPO.b4,
+    ...TYPO.b2, // Slightly larger bold text
     fontWeight: WEIGHT.semibold,
     color: DS.white,
   },
   secondaryButton: {
-    height: 46,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
+    height: 52,
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
     borderColor: DS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 12,
   },
   secondaryButtonText: {
-    ...TYPO.b4,
+    ...TYPO.b2,
     fontWeight: WEIGHT.semibold,
     color: DS.primary,
   },
   linkButton: {
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 16,
+    paddingVertical: 8,
   },
   linkText: {
-    ...TYPO.b4,
+    ...TYPO.b3,
+    fontWeight: WEIGHT.semibold,
     color: DS.primary,
   },
 });

@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import AppHeader from '../../components/common/AppHeader';
@@ -40,11 +41,30 @@ const activities = [
 ];
 
 export default function GodownProfileScreen() {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(AUTH_USER_KEY).then((data) => {
+      if (data) {
+        setUser(JSON.parse(data));
+      }
+    });
+  }, []);
+
   const handleSignOut = async () => {
     await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
     Alert.alert('Signed out', 'You have been signed out successfully.');
     router.replace('/login');
   };
+
+  const profileName = user?.name || "Godown Manager";
+  const profileInitials = profileName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+  const profilePhone = user?.phone || "+91 9876543210";
 
   return (
     <ScreenContainer>
@@ -54,14 +74,14 @@ export default function GodownProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.userRow}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>RK</Text>
+              <Text style={styles.avatarText}>{profileInitials}</Text>
             </View>
 
             <View>
-              <Text style={styles.name}>Ravi Kumar</Text>
+              <Text style={styles.name}>{profileName}</Text>
               <View style={styles.phoneRow}>
                 <Ionicons name="call-outline" size={14} color={DS.textSecondary} />
-                <Text style={styles.phone}>+91 9876543210</Text>
+                <Text style={styles.phone}>{profilePhone}</Text>
               </View>
             </View>
           </View>
@@ -71,7 +91,7 @@ export default function GodownProfileScreen() {
               <Ionicons name="shield-outline" size={16} color={DS.primary} />
               <View>
                 <Text style={styles.infoLabel}>ROLE</Text>
-                <Text style={styles.infoValue}>Manager</Text>
+                <Text style={styles.infoValue}>Godown Manager</Text>
               </View>
             </View>
 

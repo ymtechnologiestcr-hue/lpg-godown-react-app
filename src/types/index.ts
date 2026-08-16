@@ -17,6 +17,7 @@ export type DriverStats = {
 export type DriverDeliveryItem = {
   saleId: number;
   customerName: string;
+  consumerNumber?: string | null;
   address: string;
   product: string;
   quantity: number;
@@ -265,6 +266,7 @@ export type PurchaseLoad = {
   productType: 'DOMESTIC' | 'COMMERCIAL' | 'MIXED';
   invoiceUrl?: string | null;
   invoiceSource?: 'CAMERA' | 'GALLERY' | null;
+  invoiceNumber?: string | null;
   totalQuantity: number;
   itemsCount?: number;
   status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'CANCELLED';

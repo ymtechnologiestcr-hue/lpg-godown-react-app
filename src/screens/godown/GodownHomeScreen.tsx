@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -62,7 +62,8 @@ export default function GodownHomeScreen() {
       title: 'Domestic\nAvailable',
       value: dashboardData?.available?.domestic?.total ?? 0,
       type: 'domestic',
-      icon: 'cube-outline',
+      icon: 'gas-cylinder',
+      iconFamily: 'MaterialCommunityIcons',
       color: DS.primary,
       bg: DS.blueSoft,
     },
@@ -70,7 +71,8 @@ export default function GodownHomeScreen() {
       title: 'Commercial\nAvailable',
       value: dashboardData?.available?.commercial?.total ?? 0,
       type: 'commercial',
-      icon: 'cube-outline',
+      icon: 'gas-cylinder',
+      iconFamily: 'MaterialCommunityIcons',
       color: DS.green,
       bg: DS.greenSoft,
     },
@@ -220,11 +222,19 @@ export default function GodownHomeScreen() {
                   onPress={() => handleCardPress(card.type)}
                 >
                   <View style={[styles.iconBox, { backgroundColor: card.bg }]}>
-                    <Ionicons
-                      name={card.icon as any}
-                      size={22}
-                      color={card.color}
-                    />
+                    {card.iconFamily === 'MaterialCommunityIcons' ? (
+                      <MaterialCommunityIcons
+                        name={card.icon as any}
+                        size={22}
+                        color={card.color}
+                      />
+                    ) : (
+                      <Ionicons
+                        name={card.icon as any}
+                        size={22}
+                        color={card.color}
+                      />
+                    )}
                   </View>
 
                   <View style={styles.cardTextBox}>

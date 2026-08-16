@@ -1,33 +1,35 @@
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRouter } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
-import AppHeader from '../components/common/AppHeader';
-import ScreenContainer from '../components/common/ScreenContainer';
-import { AUTH_USER_KEY } from '../constants/auth';
-import { DS, TYPO, RADIUS, PALETTE, WEIGHT } from '../constants/designSystem';
-import { useDateRange } from '../context/DateRangeContext';
-import api from '../services/api';
-import { DriverDeliveriesResponse } from '../types';
+  ActivityIndicator,
+  Image,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import AppHeader from "../components/common/AppHeader";
+import ScreenContainer from "../components/common/ScreenContainer";
+import { AUTH_USER_KEY } from "../constants/auth";
+import { DS, PALETTE, RADIUS, TYPO, WEIGHT } from "../constants/designSystem";
+import { useDateRange } from "../context/DateRangeContext";
+import api from "../services/api";
+import { DriverDeliveriesResponse } from "../types";
 
 const formatTime = (value?: string | null) => {
-  if (!value) return '';
+  if (!value) return "";
   try {
     const date = new Date(value);
     return date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
     });
   } catch {
-    return '';
+    return "";
   }
 };
 
@@ -38,7 +40,7 @@ export default function DeliveredCylindersScreen() {
   const [data, setData] = useState<DriverDeliveriesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const loadDriverId = async () => {
@@ -50,11 +52,11 @@ export default function DeliveredCylindersScreen() {
         if (id && !Number.isNaN(id)) {
           setDriverId(id);
         } else {
-          setError('Driver not found in session');
+          setError("Driver not found in session");
           setLoading(false);
         }
       } catch {
-        setError('Failed to load driver session');
+        setError("Failed to load driver session");
         setLoading(false);
       }
     };
@@ -68,22 +70,22 @@ export default function DeliveredCylindersScreen() {
     }
 
     try {
-      setError('');
+      setError("");
       const response = await api.get(
-        `/drivers/${driverId}/app-deliveries?flag=delivered`
+        `/drivers/${driverId}/app-deliveries?flag=delivered`,
       );
 
       if (response.data?.success) {
         setData(response.data.data);
       } else {
-        setError('Failed to load delivered cylinders');
+        setError("Failed to load delivered cylinders");
       }
     } catch (err: any) {
       console.error(
-        'fetchDeliveredDeliveries error:',
-        err?.response?.data || err.message
+        "fetchDeliveredDeliveries error:",
+        err?.response?.data || err.message,
       );
-      setError('Failed to load delivered cylinders');
+      setError("Failed to load delivered cylinders");
     }
   }, [driverId]);
 
@@ -121,7 +123,10 @@ export default function DeliveredCylindersScreen() {
 
       <View style={styles.content}>
         <View style={styles.titleRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
             <Ionicons name="arrow-back" size={28} color={DS.textPrimary} />
           </TouchableOpacity>
           <Text style={styles.pageTitle}>Delivered Cylinders</Text>
@@ -135,7 +140,10 @@ export default function DeliveredCylindersScreen() {
         ) : error ? (
           <View style={styles.centerBox}>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchDeliveredDeliveries}>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={fetchDeliveredDeliveries}
+            >
               <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>
@@ -144,15 +152,28 @@ export default function DeliveredCylindersScreen() {
             <View style={styles.summaryCard}>
               <View style={styles.summaryRow}>
                 <View style={styles.summaryIconWrap}>
-                  <Ionicons
-                    name="checkmark-circle-outline"
-                    size={26}
-                    color={DS.green}
+                  <Image
+                    source={require("../../assets/images/Cylinder.png")}
+                    style={{ width: 42, height: 48, resizeMode: "contain" }}
                   />
                 </View>
-                <View>
-                  <Text style={styles.summaryValue}>{deliveredCount}</Text>
-                  <Text style={styles.summaryLabel}>Total Deliveries Today</Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text
+                    style={[
+                      styles.summaryLabel,
+                      { marginTop: 0, marginRight: 6 },
+                    ]}
+                  >
+                    Total Deliveries Today :
+                  </Text>
+                  <Text style={[styles.summaryValue, { marginRight: 6 }]}>
+                    {deliveredCount}
+                  </Text>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={22}
+                    color={DS.green}
+                  />
                 </View>
               </View>
             </View>
@@ -164,6 +185,14 @@ export default function DeliveredCylindersScreen() {
                     <View style={styles.cardInfoWrap}>
                       <Text style={styles.name}>{item.customerName}</Text>
 
+                      {item.consumerNumber ? (
+                        <View style={styles.consumerNumberRow}>
+                          <Text style={styles.consumerNumberText}>
+                            Consumer No: {item.consumerNumber}
+                          </Text>
+                        </View>
+                      ) : null}
+
                       <View style={styles.addressRow}>
                         <Ionicons
                           name="location-outline"
@@ -174,14 +203,17 @@ export default function DeliveredCylindersScreen() {
                       </View>
 
                       <Text style={styles.meta}>
-                        {item.product} · Qty: {item.quantity} · ₹{item.totalAmount}
+                        {item.product} · Qty: {item.quantity} · ₹
+                        {item.totalAmount}
                       </Text>
                     </View>
 
                     <View style={styles.rightWrap}>
                       <View style={styles.paymentBadge}>
                         <Text style={styles.paymentBadgeText}>
-                          {item.paymentMode === 'CARD' ? 'Online' : item.paymentMode}
+                          {item.paymentMode === "CARD"
+                            ? "Online"
+                            : item.paymentMode}
                         </Text>
                       </View>
 
@@ -194,7 +226,9 @@ export default function DeliveredCylindersScreen() {
               ))
             ) : (
               <View style={styles.emptyBox}>
-                <Text style={styles.infoText}>No delivered cylinders found</Text>
+                <Text style={styles.infoText}>
+                  No delivered cylinders found
+                </Text>
               </View>
             )}
           </>
@@ -211,8 +245,8 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 18,
   },
   backButton: {
@@ -230,16 +264,16 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   summaryIconWrap: {
     width: 34,
     height: 34,
     borderRadius: 17,
     backgroundColor: PALETTE.green100,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   summaryValue: {
@@ -260,8 +294,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 12,
   },
   cardInfoWrap: {
@@ -272,9 +306,17 @@ const styles = StyleSheet.create({
     color: DS.textPrimary,
     marginBottom: 6,
   },
+  consumerNumberRow: {
+    marginBottom: 6,
+  },
+  consumerNumberText: {
+    ...TYPO.b3,
+    color: PALETTE.blue600,
+    fontWeight: "500",
+  },
   addressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 4,
   },
   address: {
@@ -289,8 +331,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   rightWrap: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
+    alignItems: "flex-end",
+    justifyContent: "space-between",
   },
   paymentBadge: {
     backgroundColor: DS.greenSoft,
@@ -298,7 +340,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     minWidth: 48,
-    alignItems: 'center',
+    alignItems: "center",
   },
   paymentBadgeText: {
     ...TYPO.c2,
@@ -312,8 +354,8 @@ const styles = StyleSheet.create({
   },
   centerBox: {
     paddingVertical: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   infoText: {
     ...TYPO.b3,
@@ -342,6 +384,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: DS.border,
     padding: 18,
-    alignItems: 'center',
+    alignItems: "center",
   },
 });

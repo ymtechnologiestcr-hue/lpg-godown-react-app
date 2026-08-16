@@ -23,7 +23,7 @@ import {
   getActivePurchaseTrip,
   getPurchaseBootstrap,
   getPurchaseExpenses,
-  uploadOdometerImage,
+  uploadSupportingDocument,
 } from '../../services/purchaseService';
 import type { PurchaseExpense, PurchaseTripOverview } from '../../types';
 
@@ -176,7 +176,7 @@ export default function PurchaseExpensesScreen() {
       let uploadedBillUrl: string | null = null;
       if (billUri) {
         try {
-          uploadedBillUrl = await uploadOdometerImage(billUri);
+          uploadedBillUrl = await uploadSupportingDocument(billUri);
         } catch (uploadError) {
           console.log('Upload expense bill error:', uploadError);
           Alert.alert('Upload failed', 'Could not upload the bill image. Please try again.');

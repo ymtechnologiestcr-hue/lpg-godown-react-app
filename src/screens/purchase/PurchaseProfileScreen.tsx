@@ -2,18 +2,39 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Alert, DeviceEventEmitter, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
 
 import ScreenContainer from '../../components/common/ScreenContainer';
 import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from '../../constants/auth';
 import { DS, TYPO, EYEBROW, RADIUS, PALETTE, WEIGHT } from '../../constants/designSystem';
 
 export default function PurchaseProfileScreen() {
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(AUTH_USER_KEY).then((data) => {
+      if (data) {
+        setUser(JSON.parse(data));
+      }
+    });
+  }, []);
+
   const handleSignOut = async () => {
     await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
     DeviceEventEmitter.emit('APP_ROLE_CHANGED', null);
     Alert.alert('Signed out', 'You have been signed out successfully.');
     router.replace('/login');
   };
+
+  const profileName = user?.name || "Purchase Driver";
+  const profileInitials = profileName
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .substring(0, 2)
+    .toUpperCase();
+  const profilePhone = user?.phone ? `+91 ${user.phone}` : "+91 98765 43210";
+  const profileRole = user?.role === 'PURCHASE_MANAGER' ? 'Purchase Manager' : 'Purchase Driver';
 
   return (
     <ScreenContainer>
@@ -22,12 +43,12 @@ export default function PurchaseProfileScreen() {
           <View style={styles.headerBlue}>
             <View style={styles.avatarWrap}>
               <View style={styles.avatar}>
-                <Text style={styles.avatarText}>RK</Text>
+                <Text style={styles.avatarText}>{profileInitials}</Text>
               </View>
 
               <View>
-                <Text style={styles.name}>Rajesh Kumar</Text>
-                <Text style={styles.metaSub}>Purchase Driver</Text>
+                <Text style={styles.name}>{profileName}</Text>
+                <Text style={styles.metaSub}>{profileRole}</Text>
                 <View style={styles.verifiedPill}>
                   <Text style={styles.verifiedText}>VERIFIED</Text>
                 </View>
@@ -38,9 +59,9 @@ export default function PurchaseProfileScreen() {
           <View style={styles.sectionCard}>
             <Text style={styles.sectionLabel}>DRIVER DETAILS</Text>
 
-            <InfoRow icon="call-outline" label="Phone Number" value="+91 98765 43210" />
-            <InfoRow icon="car-outline" label="Vehicle Number" value="TN 09 AB 1234" />
-            <InfoRow icon="card-outline" label="Driver License" value="TN09 20180001234" noBorder />
+            <InfoRow icon="call-outline" label="Phone Number" value={profilePhone} />
+            <InfoRow icon="car-outline" label="Vehicle Number" value={user?.vehicleNumber || ""} />
+            <InfoRow icon="card-outline" label="Driver License" value={user?.driverLicense || ""} noBorder />
           </View>
 
           <View style={styles.sectionCardSmallGap}>
