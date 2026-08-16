@@ -1,40 +1,47 @@
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { router } from "expo-router";
+import { useEffect, useState } from "react";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
-import AppHeader from '../../components/common/AppHeader';
-import ScreenContainer from '../../components/common/ScreenContainer';
-import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from '../../constants/auth';
-import { DS, TYPO, EYEBROW, RADIUS, PALETTE, WEIGHT } from '../../constants/designSystem';
+import AppHeader from "../../components/common/AppHeader";
+import ScreenContainer from "../../components/common/ScreenContainer";
+import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from "../../constants/auth";
+import {
+  DS,
+  EYEBROW,
+  PALETTE,
+  RADIUS,
+  TYPO,
+  WEIGHT,
+} from "../../constants/designSystem";
 
 const activities = [
   {
-    title: '50 Domestic cylinders received from HP Gas Depot',
-    time: 'Today, 9:30 AM',
-    icon: 'arrow-down-circle-outline',
+    title: "50 Domestic cylinders received from HP Gas Depot",
+    time: "Today, 9:30 AM",
+    icon: "arrow-down-circle-outline",
     color: DS.green,
     bg: DS.greenSoft,
   },
   {
-    title: '15 Domestic cylinders allocated to Ravi Kumar',
-    time: 'Today, 10:15 AM',
-    icon: 'arrow-up-circle-outline',
+    title: "15 Domestic cylinders allocated to Ravi Kumar",
+    time: "Today, 10:15 AM",
+    icon: "arrow-up-circle-outline",
     color: DS.primary,
     bg: DS.blueSoft,
   },
   {
-    title: '12 empty cylinders returned by Suresh Yadav',
-    time: 'Today, 11:00 AM',
-    icon: 'refresh-outline',
+    title: "12 empty cylinders returned by Suresh Yadav",
+    time: "Today, 11:00 AM",
+    icon: "refresh-outline",
     color: DS.orange,
     bg: DS.orangeSoft,
   },
   {
-    title: '20 Commercial cylinders allocated to Amit Singh',
-    time: 'Today, 12:00 PM',
-    icon: 'arrow-up-circle-outline',
+    title: "20 Commercial cylinders allocated to Amit Singh",
+    time: "Today, 12:00 PM",
+    icon: "arrow-up-circle-outline",
     color: DS.primary,
     bg: DS.blueSoft,
   },
@@ -53,8 +60,8 @@ export default function GodownProfileScreen() {
 
   const handleSignOut = async () => {
     await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
-    Alert.alert('Signed out', 'You have been signed out successfully.');
-    router.replace('/login');
+    Alert.alert("Signed out", "You have been signed out successfully.");
+    router.replace("/login");
   };
 
   const profileName = user?.name || "Godown Manager";
@@ -80,7 +87,11 @@ export default function GodownProfileScreen() {
             <View>
               <Text style={styles.name}>{profileName}</Text>
               <View style={styles.phoneRow}>
-                <Ionicons name="call-outline" size={14} color={DS.textSecondary} />
+                <Ionicons
+                  name="call-outline"
+                  size={14}
+                  color={DS.textSecondary}
+                />
                 <Text style={styles.phone}>{profilePhone}</Text>
               </View>
             </View>
@@ -104,12 +115,15 @@ export default function GodownProfileScreen() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}
+          >
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Activity History</Text>
+        {/* <Text style={styles.sectionTitle}>Activity History</Text>
 
         <View style={styles.filterRow}>
           <TouchableOpacity style={[styles.filterButton, styles.filterActive]}>
@@ -136,7 +150,7 @@ export default function GodownProfileScreen() {
               <Text style={styles.activityTime}>{item.time}</Text>
             </View>
           </View>
-        ))}
+        ))} */}
       </View>
     </ScreenContainer>
   );
@@ -155,8 +169,8 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 18,
   },
   avatar: {
@@ -164,8 +178,8 @@ const styles = StyleSheet.create({
     height: 62,
     borderRadius: 31,
     backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 18,
   },
   avatarText: {
@@ -177,8 +191,8 @@ const styles = StyleSheet.create({
     color: DS.textPrimary,
   },
   phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 6,
     gap: 4,
   },
@@ -187,7 +201,7 @@ const styles = StyleSheet.create({
     color: DS.textSecondary,
   },
   infoRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     marginBottom: 14,
   },
@@ -196,8 +210,8 @@ const styles = StyleSheet.create({
     backgroundColor: DS.surface,
     borderRadius: RADIUS.md,
     padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   infoLabel: {
@@ -210,8 +224,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   roleSwitchWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
   },
   signOutButton: {
@@ -220,8 +234,8 @@ const styles = StyleSheet.create({
     borderColor: PALETTE.red100,
     borderRadius: RADIUS.md,
     backgroundColor: DS.redSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   signOutText: {
     ...TYPO.b4,
@@ -230,14 +244,14 @@ const styles = StyleSheet.create({
   },
   roleButton: {
     flexGrow: 1,
-    flexBasis: '30%',
+    flexBasis: "30%",
     minHeight: 50,
     borderWidth: 1,
     borderColor: DS.border,
     borderRadius: RADIUS.md,
     backgroundColor: DS.card,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 8,
   },
   roleButtonActive: {
@@ -247,7 +261,7 @@ const styles = StyleSheet.create({
   roleButtonText: {
     ...TYPO.c2,
     color: DS.textSecondary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   roleButtonTextActive: {
     color: DS.primary,
@@ -258,7 +272,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   filterRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
     marginBottom: 12,
   },
@@ -269,7 +283,7 @@ const styles = StyleSheet.create({
     backgroundColor: DS.card,
     borderWidth: 1,
     borderColor: DS.border,
-    alignItems: 'center',
+    alignItems: "center",
   },
   filterActive: {
     backgroundColor: DS.primary,
@@ -290,14 +304,14 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: 14,
     marginBottom: 10,
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   activityIcon: {
     width: 40,
     height: 40,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   activityTextBox: {

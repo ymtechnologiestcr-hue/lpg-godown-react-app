@@ -193,12 +193,7 @@ export default function AppHeader() {
           <Text style={styles.name}>Hi {userName || "User"} !</Text>
         </View>
 
-        <View style={styles.iconRow}>
-          <TouchableOpacity style={styles.bellBtn}>
-            <Ionicons name="notifications" size={20} color={DS.primary} />
-            <View style={styles.notificationDot} />
-          </TouchableOpacity>
-        </View>
+
       </View>
 
       <Modal

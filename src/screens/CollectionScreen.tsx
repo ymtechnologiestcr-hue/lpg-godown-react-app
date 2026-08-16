@@ -464,11 +464,6 @@ export default function CollectionScreen() {
             <Text style={styles.headerDriverName}>{driverName || "Driver"}</Text>
             <Text style={styles.headerDate}>{currentFormattedDate}</Text>
           </View>
-          <View style={styles.headerIcons}>
-            <Ionicons name="search-outline" size={24} color={DS.white} />
-            <Ionicons name="scan-outline" size={24} color={DS.white} style={{ marginLeft: 16 }} />
-            <Ionicons name="notifications-outline" size={24} color={DS.white} style={{ marginLeft: 16 }} />
-          </View>
         </View>
       </View>
 

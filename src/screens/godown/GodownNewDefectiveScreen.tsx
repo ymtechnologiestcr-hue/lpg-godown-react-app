@@ -126,11 +126,6 @@ export default function GodownNewDefectiveScreen() {
     <ScreenContainer>
       <AppHeader />
 
-      <View style={styles.topTabs}>
-        <Text style={styles.inactiveTab}>Stock In</Text>
-        <Text style={styles.inactiveTab}>Stock Out</Text>
-        <Text style={styles.activeTab}>Defectives</Text>
-      </View>
 
       <View style={styles.content}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -271,23 +266,6 @@ export default function GodownNewDefectiveScreen() {
               </>
             )}
 
-            <Text style={styles.label}>BAY / RACK LOCATION</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="3"
-              value={bayLocation}
-              onChangeText={setBayLocation}
-            />
-
-            <Text style={styles.label}>NOTES (OPTIONAL)</Text>
-            <TextInput
-              style={styles.notesInput}
-              placeholder="Describe the defect (leak, dent, valve, etc.)"
-              placeholderTextColor={DS.textTertiary}
-              value={notes}
-              onChangeText={setNotes}
-              multiline
-            />
 
             <TouchableOpacity
               style={[styles.nextButton, submitting && styles.disabledButton]}
