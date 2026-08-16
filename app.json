@@ -1,9 +1,9 @@
 {
   "expo": {
     "name": "LPGGodownApp",
-    "slug": "LPGGodownApp",
+    "slug": "ymtech",
     "version": "1.0.0",
-    "owner": "Ymtech",
+    "owner": "youngestminds-tech",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "lpggodownapp",
