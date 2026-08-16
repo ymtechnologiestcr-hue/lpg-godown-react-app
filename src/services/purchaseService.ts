@@ -13,24 +13,30 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import { AUTH_TOKEN_KEY } from "../constants/auth";
 
-// Dedicated axios instance for file uploads — no timeout so large images don't abort.
-const uploadApi = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 0,
-});
+// Reliable fetch wrapper for FormData uploads on React Native to bypass Axios bugs.
+const fetchUpload = async (url: string, formData: FormData) => {
+  const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+  const res = await fetch(`${API_BASE_URL}${url}`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // DO NOT explicitly set Content-Type; fetch will set it with the correct boundary natively.
+    },
+    body: formData,
+  });
 
-// ADD THIS ENTIRE BLOCK:
-uploadApi.interceptors.request.use(async (config) => {
-  try {
-    const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  } catch (error) {
-    console.error("Error retrieving token for uploadApi:", error);
+  const json = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    // Throw an error that mimics Axios so UI components can check error.response?.status
+    const err: any = new Error(json?.message || "Upload failed");
+    err.isAxiosError = true;
+    err.response = { status: res.status, data: json };
+    throw err;
   }
-  return config;
-});
+
+  return json;
+};
 
 // Upload a generic image file (e.g. invoice, bill) to the backend and return the server-hosted URL.
 // localUri is the device-local URI returned by expo-image-picker.
@@ -57,15 +63,8 @@ export const uploadSupportingDocument = async (
     } as unknown as Blob);
   }
 
-  const res = await uploadApi.post<{ url: string }>(
-    "/upload/supporting-document",
-    formData,
-    {
-      // No explicit Content-Type header so the browser can add the boundary!
-      transformRequest: (data) => data,
-    },
-  );
-  return res.data.url;
+  const res = await fetchUpload("/upload/supporting-document", formData);
+  return res.url;
 };
 
 export const getPurchaseBootstrap = async () => {
@@ -117,12 +116,8 @@ export const startPurchaseTrip = async (payload: {
     }
   }
 
-  const res = await uploadApi.post<{ success: boolean; data: any }>(
-    "/upload/odometer",
-    formData,
-    { transformRequest: (data) => data },
-  );
-  return res.data.data;
+  const res = await fetchUpload("/upload/odometer", formData);
+  return res.data;
 };
 
 // --- END TRIP ---
@@ -174,12 +169,8 @@ export const submitPurchaseTrip = async (payload: {
     }
   }
 
-  const res = await uploadApi.post<{ success: boolean; data: any }>(
-    "/upload/odometer",
-    formData,
-    { transformRequest: (data) => data },
-  );
-  return res.data.data;
+  const res = await fetchUpload("/upload/odometer", formData);
+  return res.data;
 };
 
 export const getActivePurchaseTrip = async (userId: number) => {
