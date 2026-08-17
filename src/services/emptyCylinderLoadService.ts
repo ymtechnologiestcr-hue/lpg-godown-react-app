@@ -57,7 +57,7 @@ export const createEmptyCylinderLoad = async (payload: {
   purchase_manager_id: number;
   vehicle_number?: string | null;
   erv_number?: string | null;
-  items: { product_id: number; quantity: number }[];
+  items: { product_id: number; quantity: number; defective_quantity?: number }[];
 }) => {
   const res = await api.post('/empty-cylinder-loads', payload);
   return res.data;

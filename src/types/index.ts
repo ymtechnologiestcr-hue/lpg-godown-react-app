@@ -21,8 +21,8 @@ export type DriverDeliveryItem = {
   address: string;
   product: string;
   quantity: number;
-  rawStatus: 'PENDING' | 'ASSIGNED' | 'DELIVERED' | 'CANCELLED';
-  status: 'Pending' | 'Delivered' | 'Cancelled';
+  rawStatus: "PENDING" | "ASSIGNED" | "DELIVERED" | "CANCELLED";
+  status: "Pending" | "Delivered" | "Cancelled";
   totalAmount: number;
   createdAt: string;
   deliveredAt?: string | null;
@@ -210,7 +210,7 @@ export type DriverProfileHistoryResponse = {
 export type ProductSearchItem = {
   id: number;
   name: string;
-  type: 'DOMESTIC' | 'COMMERCIAL';
+  type: "DOMESTIC" | "COMMERCIAL";
   price: number;
   categoryName: string;
 };
@@ -219,7 +219,7 @@ export type PurchaseProduct = {
   id: number;
   name: string;
   category: string;
-  type: 'DOMESTIC' | 'COMMERCIAL';
+  type: "DOMESTIC" | "COMMERCIAL";
 };
 
 export type PurchaseBootstrap = {
@@ -242,7 +242,12 @@ export type PurchaseBootstrap = {
 
 export type PurchaseTripSummary = {
   id: number;
-  status: 'IN_PROGRESS' | 'WAITING_APPROVAL' | 'APPROVED' | 'COMPLETED' | 'CANCELLED';
+  status:
+    | "IN_PROGRESS"
+    | "WAITING_APPROVAL"
+    | "APPROVED"
+    | "COMPLETED"
+    | "CANCELLED";
   startKm: number;
   startedAt: string;
   endedAt?: string | null;
@@ -255,7 +260,7 @@ export type PurchaseTripSummary = {
 export type PurchaseLoadItem = {
   productId: number;
   name: string;
-  type: 'DOMESTIC' | 'COMMERCIAL';
+  type: "DOMESTIC" | "COMMERCIAL";
   category: string;
   quantity: number;
 };
@@ -263,13 +268,13 @@ export type PurchaseLoadItem = {
 export type PurchaseLoad = {
   id: number;
   tripId: number;
-  productType: 'DOMESTIC' | 'COMMERCIAL' | 'MIXED';
+  productType: "DOMESTIC" | "COMMERCIAL" | "MIXED";
   invoiceUrl?: string | null;
-  invoiceSource?: 'CAMERA' | 'GALLERY' | null;
+  invoiceSource?: "CAMERA" | "GALLERY" | null;
   invoiceNumber?: string | null;
   totalQuantity: number;
   itemsCount?: number;
-  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'CANCELLED';
+  status: "DRAFT" | "PENDING" | "APPROVED" | "CANCELLED";
   tripStatus?: string;
   createdAt: string;
   items?: PurchaseLoadItem[];
@@ -282,13 +287,16 @@ export type PurchaseExpense = {
   description?: string | null;
   amount: number;
   billUrl?: string | null;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: "PENDING" | "APPROVED" | "REJECTED";
   tripStatus?: string;
   createdAt: string;
 };
 
 export type PurchaseTripOverview = {
   id: number;
+  tripType?: string;
+  emptyLoadId?: number | null;
+  emptyLoad?: EmptyCylinderLoad | null;
   purchaseManagerId: number;
   purchaseManagerName: string;
   stockAreaId?: number | null;
@@ -297,7 +305,12 @@ export type PurchaseTripOverview = {
   endOdometerReading?: number | null;
   odometerImageUrl?: string | null;
   endOdometerImageUrl?: string | null;
-  status: 'IN_PROGRESS' | 'WAITING_APPROVAL' | 'APPROVED' | 'COMPLETED' | 'CANCELLED';
+  status:
+    | "IN_PROGRESS"
+    | "WAITING_APPROVAL"
+    | "APPROVED"
+    | "COMPLETED"
+    | "CANCELLED";
   startedAt: string;
   endedAt?: string | null;
   loads: PurchaseLoad[];
@@ -320,10 +333,10 @@ export type PurchaseDashboard = {
   }[];
 };
 export type EmptyCylinderLoadStatus =
-  | 'PENDING'
-  | 'ACCEPTED'
-  | 'REJECTED'
-  | 'COMPLETED';
+  | "PENDING"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "COMPLETED";
 
 export type PurchaseManagerOption = {
   id: number;
@@ -346,6 +359,8 @@ export type EmptyCylinderLoad = {
   totalQuantity: number;
   domesticQuantity: number;
   commercialQuantity: number;
+  totalDefectiveQuantity?: number;
+  tripId?: number;
 };
 
 export type EmptyCylinderLoadItem = {

@@ -25,6 +25,7 @@ import {
   WEIGHT,
 } from "../../constants/designSystem";
 import { submitPurchaseTrip } from "../../services/purchaseService";
+import { showToast } from "../../components/common/ToastManager";
 
 // Closes an empty-cylinder trip in one step: end odometer (required) plus the
 // optional IOC invoice. There is no approval gate — this completes the trip and
@@ -118,21 +119,8 @@ export default function PurchaseEndEmptyTripScreen() {
 
       DeviceEventEmitter.emit("PURCHASE_FLOW_UPDATED");
 
-      Alert.alert(
-        "Trip Completed",
-        "The empty cylinder trip and its load are now completed.",
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              router.replace(
-                numericLoadId
-                  ? (`/purchase/empty-load/${numericLoadId}` as any)
-                  : ("/purchase-trips" as any),
-              ),
-          },
-        ],
-      );
+      showToast("Empty cylinder trip and load completed successfully", "success");
+      router.replace("/purchase-home" as any);
     } catch (error) {
       const message =
         isAxiosError(error) && error.response?.data?.message
@@ -215,26 +203,41 @@ export default function PurchaseEndEmptyTripScreen() {
         <Text style={[styles.label, styles.labelSpaced]}>
           IOC INVOICE (OPTIONAL)
         </Text>
-        {invoiceUri ? (
-          <Image source={{ uri: invoiceUri }} style={styles.invoicePreview} />
-        ) : null}
-        <View style={styles.rowGap}>
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => pickImage("camera", setInvoiceUri)}
-          >
-            <Ionicons name="camera-outline" size={18} color={DS.primary} />
-            <Text style={styles.secondaryButtonText}>Camera</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => pickImage("gallery", setInvoiceUri)}
-          >
-            <Ionicons name="image-outline" size={18} color={DS.primary} />
-            <Text style={styles.secondaryButtonText}>Gallery</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={styles.captureCard}
+          onPress={() => {
+            Alert.alert("Upload Invoice", "Choose photo source", [
+              {
+                text: "Camera",
+                onPress: () => pickImage("camera", setInvoiceUri),
+              },
+              {
+                text: "Gallery",
+                onPress: () => pickImage("gallery", setInvoiceUri),
+              },
+              { text: "Cancel", style: "cancel" },
+            ]);
+          }}
+        >
+          {invoiceUri ? (
+            <Image
+              source={{ uri: invoiceUri }}
+              style={styles.capturePreview}
+            />
+          ) : (
+            <View style={styles.capturePlaceholder}>
+              <View style={styles.captureIconWrap}>
+                <Ionicons
+                  name="document-text-outline"
+                  size={22}
+                  color={DS.textSecondary}
+                />
+              </View>
+              <Text style={styles.captureText}>TAP TO ADD INVOICE</Text>
+            </View>
+          )}
+        </TouchableOpacity>
 
         <View style={styles.noticeCard}>
           <Ionicons
@@ -387,33 +390,6 @@ const styles = StyleSheet.create({
   capturePreview: {
     width: "100%",
     height: 220,
-  },
-  invoicePreview: {
-    width: "100%",
-    height: 180,
-    borderRadius: RADIUS.md,
-    marginBottom: 12,
-    backgroundColor: DS.surface,
-  },
-  rowGap: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
-  },
-  secondaryButton: {
-    flex: 1,
-    minHeight: 48,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: DS.primary,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  secondaryButtonText: {
-    ...TYPO.s2,
-    color: DS.primary,
   },
   noticeCard: {
     marginTop: 18,

@@ -115,37 +115,85 @@ export default function PurchaseHomeScreen() {
           </View>
 
           {activeTrip ? (
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.activeBanner}
-              onPress={() => {
-                if (activeTrip.status === 'IN_PROGRESS' && !activeTrip.loads.length) {
+            activeTrip.tripType === 'EMPTY' && activeTrip.emptyLoad ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.emptyTripBannerCard}
+                onPress={() => {
                   router.push({
-                    pathname: '/purchase/create-load',
-                    params: { tripId: String(activeTrip.id) },
+                    pathname: '/purchase/end-empty-trip',
+                    params: { tripId: String(activeTrip.id), loadId: String(activeTrip.emptyLoad.id) },
                   } as any);
-                  return;
-                }
+                }}
+              >
+                <View style={styles.etcTop}>
+                  <View style={styles.etcShrink}>
+                    <Text style={styles.etcTitle}>Return Trip #{activeTrip.id}</Text>
+                    <Text style={styles.etcMeta}>
+                      Load #{activeTrip.emptyLoad.id} · {activeTrip.emptyLoad.vehicleNumber}
+                    </Text>
+                  </View>
 
-                router.push('/purchase-loads' as any);
-              }}
-            >
-              <View style={styles.activeBannerDot} />
-              <Text style={styles.activeBannerText}>
-                Trip #{activeTrip.id}{' '}
-                {activeTrip.status === 'WAITING_APPROVAL'
-                  ? 'waiting approval'
-                  : activeTrip.status === 'APPROVED'
-                  ? 'approved'
-                  : 'in progress'}
-              </Text>
-              <Ionicons name="arrow-forward" size={18} color={DS.primary} />
-            </TouchableOpacity>
+                  <View style={styles.etcPill}>
+                    <Text style={styles.etcPillText}>IN PROGRESS</Text>
+                  </View>
+                </View>
+
+                <View style={styles.etcCatRow}>
+                  <View style={styles.etcCatChip}>
+                    <Text style={styles.etcCatText}>
+                      Domestic: {activeTrip.emptyLoad.domesticQuantity}
+                    </Text>
+                  </View>
+                  <View style={styles.etcCatChip}>
+                    <Text style={styles.etcCatText}>
+                      Commercial: {activeTrip.emptyLoad.commercialQuantity}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.etcBottom}>
+                  <View>
+                    <Text style={styles.etcHint}>Total empties</Text>
+                    <Text style={styles.etcQty}>{activeTrip.emptyLoad.totalQuantity}</Text>
+                  </View>
+
+                  <Ionicons name="arrow-forward" size={20} color={DS.primary} />
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                style={styles.activeBanner}
+                onPress={() => {
+                  if (activeTrip.status === 'IN_PROGRESS' && !activeTrip.loads.length) {
+                    router.push({
+                      pathname: '/purchase/create-load',
+                      params: { tripId: String(activeTrip.id) },
+                    } as any);
+                    return;
+                  }
+
+                  router.push('/purchase-loads' as any);
+                }}
+              >
+                <View style={styles.activeBannerDot} />
+                <Text style={styles.activeBannerText}>
+                  Trip #{activeTrip.id}{' '}
+                  {activeTrip.status === 'WAITING_APPROVAL'
+                    ? 'waiting approval'
+                    : activeTrip.status === 'APPROVED'
+                    ? 'approved'
+                    : 'in progress'}
+                </Text>
+                <Ionicons name="arrow-forward" size={18} color={DS.primary} />
+              </TouchableOpacity>
+            )
           ) : (
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.startTripButton}
-              onPress={() => router.push('/purchase/start-trip' as any)}
+              onPress={() => router.push('/purchase/trip-type' as any)}
             >
               <Ionicons name="bus-outline" size={26} color={DS.textPrimary} />
               <Text style={styles.startTripText}>Start New Trip</Text>
@@ -322,6 +370,70 @@ const styles = StyleSheet.create({
     flex: 1,
     color: PALETTE.primary100,
   },
+  emptyTripBannerCard: {
+    backgroundColor: DS.white,
+    borderRadius: RADIUS.lg,
+    padding: 16,
+  },
+  etcTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  etcShrink: {
+    flexShrink: 1,
+    paddingRight: 10,
+  },
+  etcTitle: {
+    ...TYPO.s1,
+    color: DS.textPrimary,
+    marginBottom: 4,
+  },
+  etcMeta: {
+    ...TYPO.c1,
+    color: DS.textSecondary,
+  },
+  etcPill: {
+    backgroundColor: DS.primarySoft,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  etcPillText: {
+    ...TYPO.c3,
+    color: DS.primary,
+    fontWeight: WEIGHT.semibold,
+  },
+  etcCatRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  etcCatChip: {
+    backgroundColor: DS.surface,
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  etcCatText: {
+    ...TYPO.c1,
+    color: DS.textSecondary,
+  },
+  etcBottom: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  etcHint: {
+    ...TYPO.c1,
+    color: DS.textSecondary,
+    marginBottom: 4,
+  },
+  etcQty: {
+    ...TYPO.h4,
+    color: DS.textPrimary,
+  },
   sheet: {
     backgroundColor: DS.background,
     marginTop: -2,
@@ -465,3 +577,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+

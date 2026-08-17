@@ -39,6 +39,7 @@ export default function GodownNewDispatchScreen() {
   const [erv, setErv] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [defectiveQuantities, setDefectiveQuantities] = useState<Record<string, string>>({});
   const [assignedBy, setAssignedBy] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -86,6 +87,11 @@ export default function GodownNewDispatchScreen() {
     0
   );
 
+  const totalDefective = allProducts.reduce(
+    (sum, item) => sum + Number(defectiveQuantities[String(item.id)] || 0),
+    0
+  );
+
   const updateQuantity = (productId: string | number, value: string) => {
     const cleanValue = value.replace(/[^0-9]/g, '');
 
@@ -101,8 +107,23 @@ export default function GodownNewDispatchScreen() {
     }));
   };
 
+  const updateDefectiveQuantity = (productId: string | number, value: string) => {
+    const cleanValue = value.replace(/[^0-9]/g, '');
+
+    const product = allProducts.find(
+      (item: any) => String(item.id) === String(productId)
+    );
+    const maxAllowed = Number(product?.defectiveAvailable || 0);
+    const bounded = Math.min(Number(cleanValue || 0), maxAllowed);
+
+    setDefectiveQuantities((prev) => ({
+      ...prev,
+      [String(productId)]: String(bounded),
+    }));
+  };
+
   const handleSubmit = async () => {
-    if (!selectedManager || totalEmpty <= 0) return;
+    if (!selectedManager || (totalEmpty <= 0 && totalDefective <= 0)) return;
 
     try {
       setSubmitting(true);
@@ -111,8 +132,9 @@ export default function GodownNewDispatchScreen() {
         .map((item) => ({
           product_id: item.id,
           quantity: Number(quantities[String(item.id)] || 0),
+          defective_quantity: Number(defectiveQuantities[String(item.id)] || 0),
         }))
-        .filter((item) => item.quantity > 0);
+        .filter((item) => item.quantity > 0 || item.defective_quantity > 0);
 
       await createEmptyCylinderLoad({
         assigned_by: assignedBy,
@@ -124,13 +146,13 @@ export default function GodownNewDispatchScreen() {
 
       DeviceEventEmitter.emit('NEW_STOCK_OUT');
 
-      Alert.alert('Success', 'Empty cylinder load dispatched to purchase driver');
+      Alert.alert('Success', 'Cylinder load dispatched to purchase driver');
       router.back();
     } catch (error) {
       const message =
         isAxiosError(error) && error.response?.data?.message
           ? String(error.response.data.message)
-          : 'Failed to dispatch empty cylinder load';
+          : 'Failed to dispatch cylinder load';
       Alert.alert('Error', message);
     } finally {
       setSubmitting(false);
@@ -278,19 +300,69 @@ export default function GodownNewDispatchScreen() {
           )}
         </View>
 
+        <Text style={styles.label}>DOMESTIC DEFECTIVES</Text>
+
+        <View style={styles.groupCard}>
+          <View style={styles.tableHeader}>
+            <Text style={styles.tableHeaderItem}>ITEM</Text>
+            <Text style={styles.tableHeaderQty}>DEFECTIVE</Text>
+          </View>
+
+          {(products.domestic || []).length ? (
+            (products.domestic || []).map((item: any) => (
+              <QtyRow
+                key={item.id}
+                label={item.name}
+                maxEmpty={Number(item.defectiveAvailable || 0)}
+                value={defectiveQuantities[String(item.id)] || '0'}
+                onChange={(value) => updateDefectiveQuantity(item.id, value)}
+              />
+            ))
+          ) : (
+            <Text style={styles.emptyRowText}>No domestic defectives in stock.</Text>
+          )}
+        </View>
+
+        <Text style={styles.label}>COMMERCIAL DEFECTIVES</Text>
+
+        <View style={styles.groupCard}>
+          <View style={styles.tableHeader}>
+            <Text style={styles.tableHeaderItem}>ITEM</Text>
+            <Text style={styles.tableHeaderQty}>DEFECTIVE</Text>
+          </View>
+
+          {(products.commercial || []).length ? (
+            (products.commercial || []).map((item: any) => (
+              <QtyRow
+                key={item.id}
+                label={item.name}
+                maxEmpty={Number(item.defectiveAvailable || 0)}
+                value={defectiveQuantities[String(item.id)] || '0'}
+                onChange={(value) => updateDefectiveQuantity(item.id, value)}
+              />
+            ))
+          ) : (
+            <Text style={styles.emptyRowText}>No commercial defectives in stock.</Text>
+          )}
+        </View>
+
         <View style={styles.totalBox}>
           <Text style={styles.totalLabel}>TOTAL EMPTIES</Text>
           <Text style={styles.totalValue}>{totalEmpty}</Text>
+        </View>
+        <View style={[styles.totalBox, { marginTop: 8 }]}>
+          <Text style={styles.totalLabel}>TOTAL DEFECTIVES</Text>
+          <Text style={styles.totalValue}>{totalDefective}</Text>
         </View>
 
         <TouchableOpacity
           style={[
             styles.submitButton,
-            (totalEmpty === 0 || !selectedManager) && styles.disabledButton,
+            ((totalEmpty === 0 && totalDefective === 0) || !selectedManager) && styles.disabledButton,
           ]}
           activeOpacity={0.85}
           onPress={handleSubmit}
-          disabled={totalEmpty === 0 || !selectedManager || submitting}
+          disabled={(totalEmpty === 0 && totalDefective === 0) || !selectedManager || submitting}
         >
           {submitting ? (
             <ActivityIndicator color={DS.white} />

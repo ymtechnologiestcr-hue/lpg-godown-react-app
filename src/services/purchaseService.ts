@@ -67,6 +67,38 @@ export const uploadSupportingDocument = async (
   return res.url;
 };
 
+export const startEmptyCylinderTrip = async (payload: {
+  userId: number;
+  emptyLoadId: number;
+  odometerReading: number;
+  odometerImageUri: string | null;
+}) => {
+  const formData = new FormData();
+
+  formData.append("action", "START_EMPTY");
+  formData.append("userId", String(payload.userId));
+  formData.append("emptyLoadId", String(payload.emptyLoadId));
+  formData.append("odometerReading", String(payload.odometerReading));
+
+  if (payload.odometerImageUri) {
+    const filename = payload.odometerImageUri.split("/").pop() ?? "odometer.jpg";
+    if (Platform.OS === "web") {
+      const response = await fetch(payload.odometerImageUri);
+      const blob = await response.blob();
+      formData.append("image", blob, filename);
+    } else {
+      formData.append("image", {
+        uri: payload.odometerImageUri,
+        name: filename,
+        type: "image/jpeg",
+      } as any);
+    }
+  }
+
+  const res = await fetchUpload("/upload/odometer", formData);
+  return res.data;
+};
+
 export const getPurchaseBootstrap = async () => {
   const res = await api.get<{ success: boolean; data: PurchaseBootstrap }>(
     "/purchase/bootstrap",
@@ -272,3 +304,5 @@ export const createPurchaseExpense = async (payload: {
   );
   return res.data.data;
 };
+
+
