@@ -53,10 +53,10 @@ export const uploadSupportingDocument = async (
     // Web requires a real Blob
     const response = await fetch(localUri);
     const blob = await response.blob();
-    formData.append("image", blob, filename);
+    formData.append("file", blob, filename);
   } else {
     // Native expects this specific object shape
-    formData.append("image", {
+    formData.append("file", {
       uri: localUri,
       name: filename,
       type: mimeType,

@@ -2,41 +2,54 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
 import { APP_ROLES, AppRole } from '../../src/constants/appRole';
 import { AUTH_USER_KEY } from '../../src/constants/auth';
 import { DS, WEIGHT } from '../../src/constants/designSystem';
 
 export default function TabsLayout() {
-  const [role, setRole] = useState<AppRole>(APP_ROLES.DRIVER);
+  const [role, setRole] = useState<AppRole | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const insets = useSafeAreaInsets();
 
   const loadRole = async () => {
-    const userText = await AsyncStorage.getItem(AUTH_USER_KEY);
+    try {
+      const userText = await AsyncStorage.getItem(AUTH_USER_KEY);
 
-    if (!userText) {
-      setRole(APP_ROLES.DRIVER);
-      return;
-    }
+      if (!userText) {
+        setRole(APP_ROLES.DRIVER);
+        return;
+      }
 
-    const user = JSON.parse(userText);
-    const savedRole = user?.role;
+      const user = JSON.parse(userText);
+      const savedRole = user?.role;
 
-    if (
-      savedRole === APP_ROLES.DRIVER ||
-      savedRole === APP_ROLES.GODOWN_MANAGER ||
-      savedRole === APP_ROLES.PURCHASE_MANAGER
-    ) {
-      setRole(savedRole);
-    } else {
-      setRole(APP_ROLES.DRIVER);
+      if (
+        savedRole === APP_ROLES.DRIVER ||
+        savedRole === APP_ROLES.GODOWN_MANAGER ||
+        savedRole === APP_ROLES.PURCHASE_MANAGER
+      ) {
+        setRole(savedRole);
+      } else {
+        setRole(APP_ROLES.DRIVER);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     loadRole();
   }, []);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={DS.primary} />
+      </View>
+    );
+  }
 
   const isDriver = role === APP_ROLES.DRIVER;
   const isGodown = role === APP_ROLES.GODOWN_MANAGER;
