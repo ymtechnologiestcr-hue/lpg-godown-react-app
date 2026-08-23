@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useState } from "react";
 import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -260,13 +260,13 @@ export default function CollectionScreen() {
     loadDriverId();
   }, []);
 
-
-
   const fetchCollectionSummary = useCallback(async () => {
     if (!driverId) return;
 
     const { startDate, endDate } = range;
-    const response = await api.get(`/drivers/${driverId}/collection-summary?startDate=${startDate}&endDate=${endDate}`);
+    const response = await api.get(
+      `/drivers/${driverId}/collection-summary?startDate=${startDate}&endDate=${endDate}`,
+    );
 
     if (response.data?.success) {
       setSummaryData(response.data.data);
@@ -313,7 +313,10 @@ export default function CollectionScreen() {
       }
     } catch (err: any) {
       setError("Failed to load data");
-      Alert.alert("Error", err?.response?.data?.message || "Failed to load data");
+      Alert.alert(
+        "Error",
+        err?.response?.data?.message || "Failed to load data",
+      );
     } finally {
       setLoading(false);
     }
@@ -322,7 +325,7 @@ export default function CollectionScreen() {
   useFocusEffect(
     useCallback(() => {
       loadScreen();
-    }, [loadScreen, rangeKey])
+    }, [loadScreen, rangeKey]),
   );
 
   const onRefresh = async () => {
@@ -363,7 +366,7 @@ export default function CollectionScreen() {
         setSettlingMethod("CASH");
         const response = await api.put(
           `/drivers/${driverId}/settle-collections`,
-          payload
+          payload,
         );
 
         if (response.data?.success) {
@@ -376,7 +379,7 @@ export default function CollectionScreen() {
     } catch (err: any) {
       Alert.alert(
         "Error",
-        err?.response?.data?.message || "Failed to settle collection"
+        err?.response?.data?.message || "Failed to settle collection",
       );
       setSettlingMethod(null);
     }
@@ -391,7 +394,7 @@ export default function CollectionScreen() {
 
     try {
       setSettlingMethod("UPI");
-      
+
       const initiateRes = await api.post("/manual-payment/initiate", {
         amount: payload.amount,
         driverId,
@@ -407,13 +410,13 @@ export default function CollectionScreen() {
 
       const verifyRes = await api.post("/manual-payment/verify", {
         order_id: initiateRes.data.order_id,
-        status: "SUCCESS"
+        status: "SUCCESS",
       });
 
       if (verifyRes.data?.success) {
         const response = await api.put(
           `/drivers/${driverId}/settle-collections`,
-          { method: "UPI", amount: payload.amount }
+          { method: "UPI", amount: payload.amount },
         );
 
         if (response.data?.success) {
@@ -422,12 +425,12 @@ export default function CollectionScreen() {
           await refreshAfterSettlement();
         }
       } else {
-         Alert.alert("Error", "Failed to verify payment");
+        Alert.alert("Error", "Failed to verify payment");
       }
     } catch (err: any) {
       Alert.alert(
         "Error",
-        err?.response?.data?.message || "Failed to settle collection via UPI"
+        err?.response?.data?.message || "Failed to settle collection via UPI",
       );
     } finally {
       setSettlingMethod(null);
@@ -461,7 +464,9 @@ export default function CollectionScreen() {
       <View style={styles.customHeader}>
         <View style={styles.headerTitleRow}>
           <View>
-            <Text style={styles.headerDriverName}>{driverName || "Driver"}</Text>
+            <Text style={styles.headerDriverName}>
+              {driverName || "Driver"}
+            </Text>
             <Text style={styles.headerDate}>{currentFormattedDate}</Text>
           </View>
         </View>
@@ -528,20 +533,33 @@ export default function CollectionScreen() {
         ) : activeTab === "summary" ? (
           <>
             <View style={styles.blueBannerCard}>
-              <Text style={styles.blueBannerTitle}>TODAY&apos;S TOTAL COLLECTION</Text>
-              <Text style={styles.blueBannerAmount}>{formatAmount(summaryData?.summary?.totalCollected)}</Text>
+              <Text style={styles.blueBannerTitle}>
+                TODAY&apos;S TOTAL COLLECTION
+              </Text>
+              <Text style={styles.blueBannerAmount}>
+                {formatAmount(summaryData?.summary?.totalCollected)}
+              </Text>
               <View style={styles.blueBannerStatsRow}>
                 <View style={styles.blueBannerStatCard}>
                   <Text style={styles.blueBannerStatLabel}>Deliveries</Text>
-                  <Text style={styles.blueBannerStatValue}>{summaryData?.summary?.totalDeliveries || 0}</Text>
+                  <Text style={styles.blueBannerStatValue}>
+                    {summaryData?.summary?.totalDeliveries || 0}
+                  </Text>
                 </View>
                 <View style={styles.blueBannerStatCard}>
                   <Text style={styles.blueBannerStatLabel}>Settled</Text>
-                  <Text style={styles.blueBannerStatValue}>{formatAmount(summaryData?.summary?.totalSettled || 0)}</Text>
+                  <Text style={styles.blueBannerStatValue}>
+                    {formatAmount(summaryData?.summary?.totalSettled || 0)}
+                  </Text>
                 </View>
                 <View style={styles.blueBannerStatCard}>
                   <Text style={styles.blueBannerStatLabel}>Balance</Text>
-                  <Text style={styles.blueBannerStatValue}>{formatAmount((summaryData?.summary?.totalCollected || 0) - (summaryData?.summary?.totalSettled || 0))}</Text>
+                  <Text style={styles.blueBannerStatValue}>
+                    {formatAmount(
+                      (summaryData?.summary?.totalCollected || 0) -
+                        (summaryData?.summary?.totalSettled || 0),
+                    )}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -551,61 +569,93 @@ export default function CollectionScreen() {
 
               <View style={styles.splitRow}>
                 <View style={styles.splitLabelRow}>
-                  <View style={[styles.splitIconWrap, { backgroundColor: '#E1F4E5' }]}>
+                  <View
+                    style={[
+                      styles.splitIconWrap,
+                      { backgroundColor: "#E1F4E5" },
+                    ]}
+                  >
                     <Ionicons name="cash-outline" size={16} color="#2E7D32" />
                   </View>
                   <Text style={styles.splitLabel}>Cash</Text>
                 </View>
-                <Text style={styles.splitAmount}>{formatAmount(summaryData?.summary?.cashCollected)}</Text>
+                <Text style={styles.splitAmount}>
+                  {formatAmount(summaryData?.summary?.cashCollected)}
+                </Text>
               </View>
 
               <View style={styles.splitDivider} />
 
               <View style={styles.splitRow}>
                 <View style={styles.splitLabelRow}>
-                  <View style={[styles.splitIconWrap, { backgroundColor: '#E3F2FD' }]}>
-                    <Ionicons name="phone-portrait-outline" size={16} color="#1565C0" />
+                  <View
+                    style={[
+                      styles.splitIconWrap,
+                      { backgroundColor: "#E3F2FD" },
+                    ]}
+                  >
+                    <Ionicons
+                      name="phone-portrait-outline"
+                      size={16}
+                      color="#1565C0"
+                    />
                   </View>
                   <Text style={styles.splitLabel}>UPI</Text>
                 </View>
-                <Text style={styles.splitAmount}>{formatAmount(summaryData?.summary?.upiCollected)}</Text>
+                <Text style={styles.splitAmount}>
+                  {formatAmount(summaryData?.summary?.upiCollected)}
+                </Text>
               </View>
 
               <View style={styles.splitDivider} />
 
               <View style={styles.splitRow}>
                 <View style={styles.splitLabelRow}>
-                  <View style={[styles.splitIconWrap, { backgroundColor: '#E3F2FD' }]}>
+                  <View
+                    style={[
+                      styles.splitIconWrap,
+                      { backgroundColor: "#E3F2FD" },
+                    ]}
+                  >
                     <Ionicons name="card-outline" size={16} color="#1565C0" />
                   </View>
                   <Text style={styles.splitLabel}>Online</Text>
                 </View>
-                <Text style={styles.splitAmount}>{formatAmount(summaryData?.summary?.onlineCollected || 0)}</Text>
+                <Text style={styles.splitAmount}>
+                  {formatAmount(summaryData?.summary?.onlineCollected || 0)}
+                </Text>
               </View>
 
               <View style={styles.splitDivider} />
 
               <View style={styles.splitRow}>
                 <View style={styles.splitLabelRow}>
-                  <View style={[styles.splitIconWrap, { backgroundColor: '#FFF3E0' }]}>
+                  <View
+                    style={[
+                      styles.splitIconWrap,
+                      { backgroundColor: "#FFF3E0" },
+                    ]}
+                  >
                     <Ionicons name="time-outline" size={16} color="#E65100" />
                   </View>
                   <Text style={styles.splitLabel}>Credit</Text>
                 </View>
-                <Text style={styles.splitAmount}>{formatAmount(summaryData?.summary?.creditCollected || 0)}</Text>
+                <Text style={styles.splitAmount}>
+                  {formatAmount(summaryData?.summary?.creditCollected || 0)}
+                </Text>
               </View>
-              
+
               <View style={styles.splitDivider} />
 
-              <View style={styles.totalRow}>
+              {/* <View style={styles.totalRow}>
                 <Text style={styles.totalLabel}>Total</Text>
                 <Text style={styles.totalAmount}>{formatAmount(summaryData?.summary?.totalCollected)}</Text>
-              </View>
+              </View> */}
 
               <TouchableOpacity
                 style={[
                   styles.ctaButton,
-                  assignedTotal === 0 && styles.ctaButtonDisabled
+                  assignedTotal === 0 && styles.ctaButtonDisabled,
                 ]}
                 disabled={assignedTotal === 0}
                 onPress={() => setSettleModalVisible(true)}
@@ -617,28 +667,46 @@ export default function CollectionScreen() {
             <View style={styles.settlementRequestsContainer}>
               <View style={styles.settlementRequestsHeader}>
                 <View>
-                  <Text style={styles.settlementRequestsTitle}>Settlement Requests</Text>
+                  <Text style={styles.settlementRequestsTitle}>
+                    Settlement Requests
+                  </Text>
                   <Text style={styles.settlementRequestsTotalPending}>
-                    Total Pending: {formatAmount(Number(cashPending?.amount || 0) + Number(upiPending?.amount || 0))}
+                    Total Pending:{" "}
+                    {formatAmount(
+                      Number(cashPending?.amount || 0) +
+                        Number(upiPending?.amount || 0),
+                    )}
                   </Text>
                 </View>
                 <Text style={styles.settlementRequestsCount}>
-                  {Number(cashPending?.count || 0) + Number(upiPending?.count || 0)} request(s)
+                  {Number(cashPending?.count || 0) +
+                    Number(upiPending?.count || 0)}{" "}
+                  request(s)
                 </Text>
               </View>
 
-              {(Number(cashPending?.count || 0) + Number(upiPending?.count || 0)) === 0 ? (
+              {Number(cashPending?.count || 0) +
+                Number(upiPending?.count || 0) ===
+              0 ? (
                 <View style={styles.emptyRequestsWrapper}>
-                  <Text style={styles.emptyRequestsText}>No settlement requests yet</Text>
+                  <Text style={styles.emptyRequestsText}>
+                    No settlement requests yet
+                  </Text>
                 </View>
               ) : (
                 <View style={styles.pendingRequestsList}>
                   {cashPending?.transactions?.map((tx: any, index: number) => (
-                    <View key={`cash-${tx.id || index}`} style={styles.pendingRequestItem}>
+                    <View
+                      key={`cash-${tx.id || index}`}
+                      style={styles.pendingRequestItem}
+                    >
                       <View style={styles.pendingRequestInfo}>
                         <Text style={styles.pendingRequestMethod}>Cash</Text>
                         <Text style={styles.pendingRequestMessage}>
-                          {tx.customerName ? `Customer: ${tx.customerName}` : cashPending.displayMessage || "Pending for approval"}
+                          {tx.customerName
+                            ? `Customer: ${tx.customerName}`
+                            : cashPending.displayMessage ||
+                              "Pending for approval"}
                         </Text>
                       </View>
                       <Text style={styles.pendingRequestAmount}>
@@ -647,11 +715,17 @@ export default function CollectionScreen() {
                     </View>
                   ))}
                   {upiPending?.transactions?.map((tx: any, index: number) => (
-                    <View key={`upi-${tx.id || index}`} style={styles.pendingRequestItem}>
+                    <View
+                      key={`upi-${tx.id || index}`}
+                      style={styles.pendingRequestItem}
+                    >
                       <View style={styles.pendingRequestInfo}>
                         <Text style={styles.pendingRequestMethod}>UPI</Text>
                         <Text style={styles.pendingRequestMessage}>
-                          {tx.customerName ? `Customer: ${tx.customerName}` : upiPending.displayMessage || "Pending for approval"}
+                          {tx.customerName
+                            ? `Customer: ${tx.customerName}`
+                            : upiPending.displayMessage ||
+                              "Pending for approval"}
                         </Text>
                       </View>
                       <Text style={styles.pendingRequestAmount}>
@@ -685,59 +759,62 @@ export default function CollectionScreen() {
                   </Text>
                 </View>
 
-                {group.transactions?.map((item: any, transactionIndex: number) => (
-                  <View
-                    key={transactionIndex}
-                    style={styles.historyTransaction}
-                  >
+                {group.transactions?.map(
+                  (item: any, transactionIndex: number) => (
                     <View
-                      style={[
-                        styles.iconWrap,
-                        {
-                          backgroundColor:
-                            item.paymentMode === "CASH"
-                              ? DS.greenSoft
-                              : DS.primarySoft,
-                        },
-                      ]}
+                      key={transactionIndex}
+                      style={styles.historyTransaction}
                     >
-                      <Ionicons
-                        name={
-                          item.paymentMode === "CASH"
-                            ? "wallet-outline"
-                            : "phone-portrait-outline"
-                        }
-                        size={18}
-                        color={
-                          item.paymentMode === "CASH" ? DS.green : DS.primary
-                        }
-                      />
-                    </View>
+                      <View
+                        style={[
+                          styles.iconWrap,
+                          {
+                            backgroundColor:
+                              item.paymentMode === "CASH"
+                                ? DS.greenSoft
+                                : DS.primarySoft,
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={
+                            item.paymentMode === "CASH"
+                              ? "wallet-outline"
+                              : "phone-portrait-outline"
+                          }
+                          size={18}
+                          color={
+                            item.paymentMode === "CASH" ? DS.green : DS.primary
+                          }
+                        />
+                      </View>
 
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.customerName}>
-                        {item.customerName}
-                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.customerName}>
+                          {item.customerName}
+                        </Text>
 
-                      <Text style={styles.customerMeta}>
-                        Qty: {item.quantity} · {getPaymentLabel(item.paymentMode)}
-                      </Text>
-                    </View>
+                        <Text style={styles.customerMeta}>
+                          Qty: {item.quantity} ·{" "}
+                          {getPaymentLabel(item.paymentMode)}
+                        </Text>
+                      </View>
 
-                    <View style={{ alignItems: "flex-end" }}>
-                      <Text style={styles.transactionAmount}>
-                        {formatAmount(item.totalAmount)}
-                      </Text>
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Text style={styles.transactionAmount}>
+                          {formatAmount(item.totalAmount)}
+                        </Text>
 
-                      <View style={styles.paidPill}>
-                        <Text style={styles.paidText}>Paid</Text>
+                        <View style={styles.paidPill}>
+                          <Text style={styles.paidText}>Paid</Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
+                  ),
+                )}
               </View>
             ))}
-            
+
             {historyData?.pagination?.hasNextPage && (
               <TouchableOpacity
                 style={styles.loadMoreButton}
@@ -771,15 +848,15 @@ export default function CollectionScreen() {
 
 const styles = StyleSheet.create({
   customHeader: {
-    backgroundColor: '#1E65F3',
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+    backgroundColor: "#1E65F3",
+    paddingTop: Platform.OS === "ios" ? 50 : 20,
     paddingBottom: 20,
     paddingHorizontal: 16,
   },
   headerTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   headerDriverName: {
     ...TYPO.h5,
@@ -787,12 +864,12 @@ const styles = StyleSheet.create({
   },
   headerDate: {
     ...TYPO.b4,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: "rgba(255, 255, 255, 0.8)",
     marginTop: 2,
   },
   headerIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   summaryCardContainer: {
     backgroundColor: DS.white,
@@ -807,107 +884,107 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
   },
   blueBannerCard: {
-    backgroundColor: '#1E65F3',
+    backgroundColor: "#1E65F3",
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
   },
   blueBannerTitle: {
-    color: 'rgba(255,255,255,0.9)',
+    color: "rgba(255,255,255,0.9)",
     fontSize: 11,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
   },
   blueBannerAmount: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: 8,
     marginBottom: 20,
   },
   blueBannerStatsRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 12,
   },
   blueBannerStatCard: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: "rgba(255,255,255,0.15)",
     borderRadius: 8,
     padding: 10,
   },
   blueBannerStatLabel: {
-    color: 'rgba(255,255,255,0.8)',
+    color: "rgba(255,255,255,0.8)",
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   blueBannerStatValue: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: 4,
   },
   splitAmountsTitle: {
     ...TYPO.s2,
     color: TEXT_BLACK,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 8,
   },
   splitRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 14,
   },
   splitLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
   splitIconWrap: {
     width: 36,
     height: 36,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   splitLabel: {
     ...TYPO.s2,
     color: TEXT_BLACK,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   splitAmount: {
     ...TYPO.s2,
     color: TEXT_BLACK,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   splitDivider: {
     height: 1,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: "#F0F0F0",
   },
   totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 16,
     marginTop: 4,
   },
   totalLabel: {
     ...TYPO.s2,
     color: TEXT_BLACK,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   totalAmount: {
     ...TYPO.s1,
-    color: '#1E65F3',
-    fontWeight: 'bold',
+    color: "#1E65F3",
+    fontWeight: "bold",
   },
   ctaButton: {
-    backgroundColor: '#1E65F3',
-    width: '100%',
+    backgroundColor: "#1E65F3",
+    width: "100%",
     paddingVertical: 14,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
   },
   ctaButtonDisabled: {
@@ -916,7 +993,7 @@ const styles = StyleSheet.create({
   ctaButtonText: {
     ...TYPO.s2,
     color: DS.white,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   content: {
     padding: 16,
@@ -1191,7 +1268,7 @@ const styles = StyleSheet.create({
   },
   loadMoreButton: {
     padding: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
   loadMoreText: {
     ...TYPO.b4,
@@ -1212,15 +1289,15 @@ const styles = StyleSheet.create({
     borderColor: DS.border,
   },
   settlementRequestsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 16,
   },
   settlementRequestsTitle: {
     ...TYPO.s2,
     color: TEXT_BLACK,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   settlementRequestsTotalPending: {
     ...TYPO.b4,
@@ -1232,7 +1309,7 @@ const styles = StyleSheet.create({
     color: DS.textSecondary,
   },
   emptyRequestsWrapper: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 16,
   },
   emptyRequestsText: {
@@ -1243,9 +1320,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   pendingRequestItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: DS.border,
@@ -1256,7 +1333,7 @@ const styles = StyleSheet.create({
   pendingRequestMethod: {
     ...TYPO.s2,
     color: TEXT_BLACK,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   pendingRequestMessage: {
     ...TYPO.c2,
@@ -1265,6 +1342,6 @@ const styles = StyleSheet.create({
   pendingRequestAmount: {
     ...TYPO.s2,
     color: TEXT_BLACK,
-    fontWeight: 'bold',
-  }
+    fontWeight: "bold",
+  },
 });
