@@ -41,12 +41,15 @@ type CollectionSummaryResponse = {
     totalCollected: number;
     totalDeliveries: number;
     totalSettled?: number;
+    totalPending?: number;
   };
   settlements: {
     cashAssigned: CollectionCardData;
     cashPending: CollectionCardData;
     upiAssigned: CollectionCardData;
     upiPending: CollectionCardData;
+    onlineAssigned: CollectionCardData;
+    onlinePending: CollectionCardData;
   };
 };
 
@@ -437,16 +440,27 @@ export default function CollectionScreen() {
     }
   };
 
-  const cashAssigned = summaryData?.settlements?.cashAssigned;
-  const cashPending = summaryData?.settlements?.cashPending;
+  const cashAssigned   = summaryData?.settlements?.cashAssigned;
+  const cashPending    = summaryData?.settlements?.cashPending;
 
-  const upiAssigned = summaryData?.settlements?.upiAssigned;
-  const upiPending = summaryData?.settlements?.upiPending;
+  const upiAssigned    = summaryData?.settlements?.upiAssigned;
+  const upiPending     = summaryData?.settlements?.upiPending;
 
-  const totalAmount = summaryData?.summary?.totalCollected ?? 0;
+  const onlineAssigned = summaryData?.settlements?.onlineAssigned;
+  const onlinePending  = summaryData?.settlements?.onlinePending;
 
+  // totalPending = all submissions awaiting cashier approval (any method)
+  const totalPendingAmount = summaryData?.summary?.totalPending ?? 0;
+  const totalPendingCount =
+    Number(cashPending?.count || 0) +
+    Number(upiPending?.count || 0) +
+    Number(onlinePending?.count || 0);
+
+  // assignedTotal = what's still with the driver, ready to settle
   const assignedTotal =
-    Number(cashAssigned?.amount || 0) + Number(upiAssigned?.amount || 0);
+    Number(cashAssigned?.amount || 0) +
+    Number(upiAssigned?.amount || 0) +
+    Number(onlineAssigned?.amount || 0);
 
   const currentFormattedDate = new Date().toLocaleDateString("en-GB", {
     weekday: "short",
@@ -672,22 +686,15 @@ export default function CollectionScreen() {
                   </Text>
                   <Text style={styles.settlementRequestsTotalPending}>
                     Total Pending:{" "}
-                    {formatAmount(
-                      Number(cashPending?.amount || 0) +
-                        Number(upiPending?.amount || 0),
-                    )}
+                    {formatAmount(totalPendingAmount)}
                   </Text>
                 </View>
                 <Text style={styles.settlementRequestsCount}>
-                  {Number(cashPending?.count || 0) +
-                    Number(upiPending?.count || 0)}{" "}
-                  request(s)
+                  {totalPendingCount}{" "}request(s)
                 </Text>
               </View>
 
-              {Number(cashPending?.count || 0) +
-                Number(upiPending?.count || 0) ===
-              0 ? (
+              {totalPendingCount === 0 ? (
                 <View style={styles.emptyRequestsWrapper}>
                   <Text style={styles.emptyRequestsText}>
                     No settlement requests yet
