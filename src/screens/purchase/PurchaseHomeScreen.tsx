@@ -122,7 +122,7 @@ export default function PurchaseHomeScreen() {
                 onPress={() => {
                   router.push({
                     pathname: '/purchase/end-empty-trip',
-                    params: { tripId: String(activeTrip.id), loadId: String(activeTrip.emptyLoad.id) },
+                    params: { tripId: String(activeTrip.id), loadId: String(activeTrip.emptyLoad?.id || '') },
                   } as any);
                 }}
               >
@@ -130,7 +130,7 @@ export default function PurchaseHomeScreen() {
                   <View style={styles.etcShrink}>
                     <Text style={styles.etcTitle}>Return Trip #{activeTrip.id}</Text>
                     <Text style={styles.etcMeta}>
-                      Load #{activeTrip.emptyLoad.id} · {activeTrip.emptyLoad.vehicleNumber}
+                      Load #{activeTrip.emptyLoad?.id || ''} · {activeTrip.emptyLoad?.vehicleNumber || ''}
                     </Text>
                   </View>
 

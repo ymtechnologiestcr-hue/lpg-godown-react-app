@@ -10,6 +10,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DS, TYPO, RADIUS } from '../../constants/designSystem';
 
 type PaymentMethod = 'CASH' | 'UPI' | 'ONLINE' | 'CREDIT';
@@ -49,11 +50,9 @@ export default function ConfirmDeliveryModal({
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.overlay}>
+    <Modal visible={visible} transparent={false} animationType="slide">
+      <SafeAreaView style={styles.fullScreenOverlay} edges={['top']}>
         <View style={styles.sheet}>
-          <View style={styles.handle} />
-
           <View style={styles.headerRow}>
             <Text style={styles.title}>Confirm Delivery</Text>
             <TouchableOpacity onPress={onClose}>
@@ -161,7 +160,7 @@ export default function ConfirmDeliveryModal({
           ) : null}
           </ScrollView>
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -172,14 +171,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.28)',
     justifyContent: 'flex-end',
   },
-  sheet: {
+  fullScreenOverlay: {
+    flex: 1,
     backgroundColor: DS.card,
-    borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl,
+  },
+  sheet: {
+    flex: 1,
+    backgroundColor: DS.card,
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 24,
-    maxHeight: '88%',
   },
   scrollArea: {
     marginTop: 8,

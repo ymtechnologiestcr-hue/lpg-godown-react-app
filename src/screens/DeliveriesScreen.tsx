@@ -1,7 +1,8 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -96,9 +97,8 @@ const formatSize = (batch: BatchItem) => {
 
 export default function DeliveriesScreen() {
   const router = useRouter();
-  const { rangeKey } = useDateRange();
+  const { range, rangeKey } = useDateRange();
   const [driverId, setDriverId] = useState<number | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
 
   const [dashboard, setDashboard] = useState<DriverDeliveriesResponse | null>(
     null,
@@ -164,76 +164,75 @@ export default function DeliveriesScreen() {
 
   const [permission, requestPermission] = useCameraPermissions();
 
-  useEffect(() => {
-    const loadDriverId = async () => {
-      try {
-        const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
-        const parsed = raw ? JSON.parse(raw) : null;
-        const role = parsed?.role ?? null;
-        setUserRole(role);
+  const resolveDriverId = useCallback(async (): Promise<number | null> => {
+    if (driverId) return driverId;
+    try {
+      const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      const id = Number(parsed?.id || parsed?.driver_id || parsed?.user_id);
+      if (id && !Number.isNaN(id)) {
+        setDriverId(id);
+        return id;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [driverId]);
 
-        // Only resolve driver id for DRIVER role.
-        if (role !== "DRIVER") {
+  const fetchDeliveries = useCallback(
+    async (isSilent = false) => {
+      try {
+        if (!isSilent) {
+          setLoading(true);
+        }
+        setError("");
+
+        const activeDriverId = await resolveDriverId();
+
+        if (!activeDriverId) {
+          setError("Driver session not found");
           return;
         }
 
-        const id = Number(parsed?.id);
-
-        if (id && !Number.isNaN(id)) {
-          setDriverId(id);
-        } else {
-          setError("Driver not found in session");
+        const params = new URLSearchParams();
+        if (range?.startDate && range?.endDate) {
+          params.append("startDate", range.startDate);
+          params.append("endDate", range.endDate);
         }
-      } catch {
-        setError("Failed to load driver session");
-      }
-    };
+        const queryStr = params.toString() ? `?${params.toString()}` : "";
 
-    loadDriverId();
-  }, []);
+        const response = await api.get(
+          `/drivers/${activeDriverId}/app-deliveries${queryStr}`,
+        );
 
-  const fetchDeliveries = useCallback(async () => {
-    if (!driverId || userRole !== "DRIVER") {
-      return;
-    }
-
-    try {
-      setError("");
-
-      const response = await api.get(`/drivers/${driverId}/app-deliveries`);
-
-      if (response.data?.success) {
-        setDashboard(response.data.data);
-      } else {
+        if (response.data?.success) {
+          setDashboard(response.data.data);
+        } else {
+          setError("Failed to load deliveries");
+        }
+      } catch (err: any) {
+        console.error(
+          "fetchDeliveries error:",
+          err?.response?.data || err.message,
+        );
         setError("Failed to load deliveries");
-      }
-    } catch (err: any) {
-      console.error(
-        "fetchDeliveries error:",
-        err?.response?.data || err.message,
-      );
-      setError("Failed to load deliveries");
-    }
-  }, [driverId, userRole]);
-
-  useEffect(() => {
-    const load = async () => {
-      if (!driverId || userRole !== "DRIVER") {
+      } finally {
         setLoading(false);
-        return;
       }
+    },
+    [resolveDriverId, range],
+  );
 
-      setLoading(true);
-      await fetchDeliveries();
-      setLoading(false);
-    };
-
-    load();
-  }, [fetchDeliveries, driverId, userRole, rangeKey]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchDeliveries();
+    }, [fetchDeliveries, rangeKey]),
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchDeliveries();
+    await fetchDeliveries(true);
     setRefreshing(false);
   };
 
@@ -318,7 +317,8 @@ export default function DeliveriesScreen() {
   };
 
   const fetchAvailableBatches = async () => {
-    if (!driverId) {
+    const activeDriverId = await resolveDriverId();
+    if (!activeDriverId) {
       setAvailableBatches([]);
       return;
     }
@@ -326,7 +326,9 @@ export default function DeliveriesScreen() {
     try {
       setBatchLoading(true);
 
-      const response = await api.get(`/drivers/${driverId}/available-batches`);
+      const response = await api.get(
+        `/drivers/${activeDriverId}/available-batches`,
+      );
 
       if (response.data?.success) {
         setAvailableBatches(response.data.data || []);
@@ -489,8 +491,14 @@ export default function DeliveriesScreen() {
     try {
       setReturnSubmitting(true);
 
+      const activeDriverId = await resolveDriverId();
+      if (!activeDriverId) {
+        Alert.alert("Error", "Driver session not found");
+        return;
+      }
+
       await api.post("/drivers/returns", {
-        driver_id: driverId,
+        driver_id: activeDriverId,
         customer_name: foundCustomer.name,
         phone: foundCustomer.phone,
         address: foundCustomer.address,
@@ -569,6 +577,13 @@ export default function DeliveriesScreen() {
     try {
       setCreateSaleLoading(true);
 
+      const activeDriverId = await resolveDriverId();
+      if (!activeDriverId) {
+        Alert.alert("Error", "Driver session not found");
+        setCreateSaleLoading(false);
+        return;
+      }
+
       const orderedQty =
         selectedBatch.productType === "COMMERCIAL" ? saleQty : 1;
       const isDomestic = selectedBatch.productType !== "COMMERCIAL";
@@ -597,7 +612,7 @@ export default function DeliveriesScreen() {
       const totalAmount = unitPrice * orderedQty;
 
       await api.post("/drivers/sales", {
-        driver_id: driverId,
+        driver_id: activeDriverId,
         customer_id: foundCustomer.id,
         customer_name: foundCustomer.name,
         phone: foundCustomer.phone,
@@ -698,7 +713,7 @@ export default function DeliveriesScreen() {
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity
                 style={styles.retryButton}
-                onPress={fetchDeliveries}
+                onPress={() => fetchDeliveries()}
               >
                 <Text style={styles.retryButtonText}>Retry</Text>
               </TouchableOpacity>
@@ -1385,25 +1400,19 @@ function BatchSelectionModal({
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={false}
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.finderOverlay}>
+      <SafeAreaView style={styles.fullScreenOverlay} edges={['top']}>
         <View
           style={[
             styles.batchSheet,
             {
               marginBottom: keyboardHeight,
-              maxHeight: Math.max(
-                windowHeight * 0.4,
-                windowHeight - keyboardHeight - 40,
-              ),
             },
           ]}
         >
-          <View style={styles.finderHandle} />
-
           <View style={styles.batchHeader}>
             <TouchableOpacity onPress={onBack}>
               <Ionicons name="arrow-back" size={28} color={DS.textSecondary} />
@@ -1553,7 +1562,7 @@ function BatchSelectionModal({
             </>
           )}
         </View>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -1831,21 +1840,17 @@ function ConfirmNewSaleModal({
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={false}
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.finderOverlay}>
+      <SafeAreaView style={styles.fullScreenOverlay} edges={['top']}>
         <TouchableWithoutFeedback onPress={() => {}}>
           <View
             style={[
               styles.confirmSaleSheet,
               {
                 marginBottom: keyboardHeight,
-                maxHeight: Math.max(
-                  windowHeight * 0.4,
-                  windowHeight - keyboardHeight - 40,
-                ),
               },
             ]}
           >
@@ -1855,8 +1860,6 @@ function ConfirmNewSaleModal({
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.confirmSaleScrollContent}
             >
-              <View style={styles.finderHandle} />
-
               <View style={styles.finderHeader}>
                 <Text style={styles.finderTitle}>Confirm Delivery</Text>
 
@@ -2065,7 +2068,7 @@ function ConfirmNewSaleModal({
             </ScrollView>
           </View>
         </TouchableWithoutFeedback>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -2296,6 +2299,10 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.42)",
     justifyContent: "flex-end",
   },
+  fullScreenOverlay: {
+    flex: 1,
+    backgroundColor: DS.card,
+  },
   modalBackdrop: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -2472,13 +2479,11 @@ const styles = StyleSheet.create({
   },
 
   batchSheet: {
+    flex: 1,
     backgroundColor: DS.card,
-    borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl,
     paddingHorizontal: 18,
     paddingTop: 8,
     paddingBottom: 24,
-    maxHeight: "88%",
   },
   batchHeader: {
     flexDirection: "row",
@@ -2585,14 +2590,12 @@ const styles = StyleSheet.create({
   },
 
   confirmSaleSheet: {
+    flex: 1,
     backgroundColor: DS.card,
-    borderTopLeftRadius: RADIUS.xxl,
-    borderTopRightRadius: RADIUS.xxl,
     width: "100%",
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 18,
-    maxHeight: "88%",
   },
   confirmSaleScroll: {
     flexShrink: 1,
