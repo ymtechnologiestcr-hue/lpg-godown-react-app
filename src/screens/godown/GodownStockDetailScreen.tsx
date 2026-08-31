@@ -41,6 +41,11 @@ type StockDetailData = {
   system?: number;
   diff?: number;
   showBookings?: boolean;
+  stockBreakdown?: {
+    godownStock: { physical: number; system: number };
+    allocatedStock: { physical: number; system: number };
+    totalStock: { physical: number; system: number };
+  };
   items: StockItem[];
 };
 
@@ -182,6 +187,51 @@ export default function GodownStockDetailScreen() {
             </View>
           </View>
         </View>
+
+        {data?.stockBreakdown && (
+          <View style={[styles.breakdownCard, { marginBottom: 22 }]}>
+            <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+              <Text style={styles.title}>Total Stock Breakdown</Text>
+            </View>
+            <View style={styles.tableHeadRow}>
+              <Text style={[styles.tableHeadText, { flex: 1.5 }]}>LOCATION</Text>
+              <Text style={[styles.tableHeadText, { textAlign: 'right' }]}>PHYSICAL</Text>
+              <Text style={[styles.tableHeadText, { textAlign: 'right' }]}>SYSTEM</Text>
+            </View>
+
+            <View style={styles.itemRow}>
+              <Text style={[styles.itemName, { flex: 1.5 }]}>Godown Stock</Text>
+              <Text style={[styles.itemMetric, { color: DS.red, textAlign: 'right' }]}>
+                {data.stockBreakdown.godownStock.physical}
+              </Text>
+              <Text style={[styles.itemMetric, { textAlign: 'right' }]}>
+                {data.stockBreakdown.godownStock.system}
+              </Text>
+            </View>
+
+            <View style={styles.itemRow}>
+              <Text style={[styles.itemName, { flex: 1.5 }]}>Allocated Stock</Text>
+              <Text style={[styles.itemMetric, { textAlign: 'right' }]}>
+                {data.stockBreakdown.allocatedStock.physical}
+              </Text>
+              <Text style={[styles.itemMetric, { textAlign: 'right' }]}>
+                {data.stockBreakdown.allocatedStock.system}
+              </Text>
+            </View>
+
+            <View style={styles.itemRow}>
+              <Text style={[styles.itemName, { flex: 1.5, fontWeight: WEIGHT.bold }]}>
+                Total Stock
+              </Text>
+              <Text style={[styles.itemMetric, { color: DS.primary, fontWeight: WEIGHT.bold, textAlign: 'right' }]}>
+                {data.stockBreakdown.totalStock.physical}
+              </Text>
+              <Text style={[styles.itemMetric, { fontWeight: WEIGHT.bold, textAlign: 'right' }]}>
+                {data.stockBreakdown.totalStock.system}
+              </Text>
+            </View>
+          </View>
+        )}
 
         {(data?.showBookings ?? isCommercial) && !isEmptyType ? (
           <TouchableOpacity

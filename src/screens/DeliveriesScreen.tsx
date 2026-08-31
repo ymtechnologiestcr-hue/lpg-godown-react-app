@@ -2,7 +2,6 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useFocusEffect, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,6 +21,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppHeader from "../components/common/AppHeader";
 import ScreenContainer from "../components/common/ScreenContainer";
@@ -611,32 +611,36 @@ export default function DeliveriesScreen() {
       const unitPrice = Number(selectedBatch.productPrice || 0);
       const totalAmount = unitPrice * orderedQty;
 
-      await api.post("/drivers/sales", {
-        driver_id: activeDriverId,
-        customer_id: foundCustomer.id,
-        customer_name: foundCustomer.name,
-        phone: foundCustomer.phone,
-        address: foundCustomer.address,
+      await api.post(
+        "/drivers/sales",
+        {
+          driver_id: activeDriverId,
+          customer_id: foundCustomer.id,
+          customer_name: foundCustomer.name,
+          phone: foundCustomer.phone,
+          address: foundCustomer.address,
 
-        cylinder_type: selectedBatch.productType,
-        product_id: selectedBatch.productId,
-        quantity: orderedQty,
+          cylinder_type: selectedBatch.productType,
+          product_id: selectedBatch.productId,
+          quantity: orderedQty,
 
-        payment_method: salePaymentMethod,
-        amount: totalAmount,
+          payment_method: salePaymentMethod,
+          amount: totalAmount,
 
-        empty_cylinder_collected: emptyCylinderQty > 0,
-        delivered_qty: orderedQty,
-        empty_cylinder_qty: Number(emptyCylinderQty || 0),
-        empty_cylinder_status: emptyCylinderStatus,
-        defective_qty: 0,
+          empty_cylinder_collected: emptyCylinderQty > 0,
+          delivered_qty: orderedQty,
+          empty_cylinder_qty: Number(emptyCylinderQty || 0),
+          empty_cylinder_status: emptyCylinderStatus,
+          defective_qty: 0,
 
-        allocation_sale_id: selectedBatch.allocationSaleId,
-        allocation_sales_item_id: selectedBatch.allocationSalesItemId,
-        batch_no: selectedBatch.batchNo,
+          allocation_sale_id: selectedBatch.allocationSaleId,
+          allocation_sales_item_id: selectedBatch.allocationSalesItemId,
+          batch_no: selectedBatch.batchNo,
 
-        otp,
-      });
+          otp,
+        },
+        { timeout: 30000 },
+      );
 
       setCreateSaleVisible(false);
       setFoundCustomer(null);
@@ -1404,7 +1408,7 @@ function BatchSelectionModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.fullScreenOverlay} edges={['top']}>
+      <SafeAreaView style={styles.fullScreenOverlay} edges={["top"]}>
         <View
           style={[
             styles.batchSheet,
@@ -1730,7 +1734,7 @@ function ReturnForm({ ret }: { ret: ReturnProps }) {
         </>
       )}
 
-      <Text style={styles.returnLabel}>Customer OTP (6-digit)</Text>
+      <Text style={styles.returnLabel}>Customer DAC Code (6-digit)</Text>
       <TextInput
         style={styles.otpInput}
         keyboardType="number-pad"
@@ -1844,7 +1848,7 @@ function ConfirmNewSaleModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.fullScreenOverlay} edges={['top']}>
+      <SafeAreaView style={styles.fullScreenOverlay} edges={["top"]}>
         <TouchableWithoutFeedback onPress={() => {}}>
           <View
             style={[
@@ -2015,9 +2019,9 @@ function ConfirmNewSaleModal({
                 </Text>
               )}
 
-              <Text style={styles.inputLabel}>Customer OTP (6-digit)</Text>
+              <Text style={styles.inputLabel}>Customer DAC Code (6-digit)</Text>
               <Text style={styles.otpHelp}>
-                Ask the customer for the OTP sent to {customer?.phone || ""}.
+                Ask the customer for the DAC Code.
               </Text>
 
               <TextInput
