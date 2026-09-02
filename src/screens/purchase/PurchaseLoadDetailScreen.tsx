@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { isAxiosError } from "axios";
+import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -73,8 +73,13 @@ const formatLoadDate = (dateString?: string) => {
   if (!dateString) return "";
   try {
     const d = new Date(dateString);
-    const day = d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-    const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }).toLowerCase();
+    const day = d.toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+    });
+    const time = d
+      .toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+      .toLowerCase();
     return `${day}, ${time}`;
   } catch {
     return dateString;
@@ -89,7 +94,9 @@ export default function PurchaseLoadDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [invoiceUris, setInvoiceUris] = useState<InvoiceMap>({});
-  const [invoiceNumbers, setInvoiceNumbers] = useState<Record<number, string>>({});
+  const [invoiceNumbers, setInvoiceNumbers] = useState<Record<number, string>>(
+    {},
+  );
   const [submittingInvoiceLoadId, setSubmittingInvoiceLoadId] = useState<
     number | null
   >(null);
@@ -129,7 +136,7 @@ export default function PurchaseLoadDetailScreen() {
     } catch (error) {
       if (
         showErrorAlert &&
-        isAxiosError(error) &&
+        axios.isAxiosError(error) &&
         error.response?.data?.message
       ) {
         Alert.alert(
@@ -351,11 +358,26 @@ export default function PurchaseLoadDetailScreen() {
       });
 
       setLoads((prev) =>
-        prev.map((item) => (item.id === loadId ? updatedLoad : item)),
+        prev.map((item) => {
+          if (item.id === loadId) {
+            return (
+              updatedLoad || {
+                ...item,
+                status: "PENDING",
+                invoiceUrl: finalInvoiceUrl,
+                invoiceSource: finalInvoiceUrl
+                  ? (source as "CAMERA" | "GALLERY" | null)
+                  : null,
+                invoiceNumber: invoiceNumbers[loadId] || null,
+              }
+            );
+          }
+          return item;
+        }),
       );
       DeviceEventEmitter.emit("PURCHASE_FLOW_UPDATED");
     } catch (error) {
-      if (isAxiosError(error) && error.response?.data?.message) {
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
         Alert.alert("Error", String(error.response.data.message));
       }
       console.log("Attach load invoice error:", error);
@@ -436,7 +458,11 @@ export default function PurchaseLoadDetailScreen() {
 
     try {
       setSubmittingTrip(true);
-      await submitTripForApproval(tripId, endOdometerImageUri, parsedEndReading);
+      await submitTripForApproval(
+        tripId,
+        endOdometerImageUri,
+        parsedEndReading,
+      );
     } catch (error) {
       console.log("Submit end trip error:", error);
       Alert.alert(
@@ -521,15 +547,18 @@ export default function PurchaseLoadDetailScreen() {
             <Text style={styles.inlineAddText}>Add Load</Text>
           </TouchableOpacity>
         </View>
-
         {loads.map((load) => {
           const invoiceUri = resolveImageUrl(
             invoiceUris[load.id] ?? load.invoiceUrl ?? null,
           );
           const canSubmitInvoice =
-            tripStatus === "IN_PROGRESS" && load.status !== "CANCELLED" && !submittingTrip;
+            tripStatus === "IN_PROGRESS" &&
+            load.status !== "CANCELLED" &&
+            !submittingTrip;
           const canCancel =
-            tripStatus === "IN_PROGRESS" && load.status !== "CANCELLED" && !submittingTrip;
+            tripStatus === "IN_PROGRESS" &&
+            load.status !== "CANCELLED" &&
+            !submittingTrip;
           const statusColors = formatStatusColors(load.status);
 
           const titleMap: Record<string, string> = {
@@ -547,7 +576,10 @@ export default function PurchaseLoadDetailScreen() {
               >
                 <View style={styles.loadCardTop}>
                   <Text style={styles.loadMeta}>
-                    Load #{load.id}{load.createdAt ? ` • ${formatLoadDate(load.createdAt)}` : ""}
+                    Load #{load.id}
+                    {load.createdAt
+                      ? ` • ${formatLoadDate(load.createdAt)}`
+                      : ""}
                   </Text>
                   <View
                     style={[
@@ -565,7 +597,9 @@ export default function PurchaseLoadDetailScreen() {
 
                 <View style={styles.loadCardTitleRow}>
                   <Text style={styles.loadTitle}>{displayTitle}</Text>
-                  <Text style={styles.totalCylText}>{load.totalQuantity} CYL</Text>
+                  <Text style={styles.totalCylText}>
+                    {load.totalQuantity} CYL
+                  </Text>
                 </View>
 
                 <View style={styles.itemList}>
@@ -575,19 +609,21 @@ export default function PurchaseLoadDetailScreen() {
                         key={`${load.id}-${item.productId}`}
                         style={styles.itemRowText}
                       >
-                        {item.name}: <Text style={styles.itemQtyBold}>{item.quantity}</Text>
+                        {item.name}:{" "}
+                        <Text style={styles.itemQtyBold}>{item.quantity}</Text>
                       </Text>
                     ))
                   ) : (
                     <Text style={styles.itemRowText}>
-                      Total Cylinders: <Text style={styles.itemQtyBold}>{load.totalQuantity}</Text>
+                      Total Cylinders:{" "}
+                      <Text style={styles.itemQtyBold}>
+                        {load.totalQuantity}
+                      </Text>
                     </Text>
                   )}
                 </View>
               </TouchableOpacity>
-
               <View style={styles.cardDivider} />
-
               <View style={styles.invoiceSection}>
                 <Text style={styles.invoiceSectionTitle}>Upload Invoice</Text>
                 <Text style={styles.invoiceSectionDesc}>
@@ -641,13 +677,16 @@ export default function PurchaseLoadDetailScreen() {
                     onPress={() => handlePickInvoice(load.id, "gallery")}
                   >
                     <View style={styles.galleryIconCircle}>
-                      <Ionicons name="image-outline" size={24} color={DS.textPrimary} />
+                      <Ionicons
+                        name="image-outline"
+                        size={24}
+                        color={DS.textPrimary}
+                      />
                     </View>
                     <Text style={styles.galleryButtonText}>Gallery</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
               <View style={styles.actionRow}>
                 <TouchableOpacity
                   style={[
@@ -687,7 +726,7 @@ export default function PurchaseLoadDetailScreen() {
             </View>
           );
         })}
-
+        ``
         {!loads.length ? (
           <View style={styles.emptyStateCard}>
             <Text style={styles.emptyText}>
