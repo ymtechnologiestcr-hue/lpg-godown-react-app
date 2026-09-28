@@ -81,7 +81,7 @@ export default function AddDeliveryScreen() {
       try {
         const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
-        const id = Number(parsed?.id);
+        const id = Number(parsed?.driver_id || parsed?.id || parsed?.user_id);
         setDriverId(Number.isNaN(id) ? null : id);
       } catch {
         setDriverId(null);

@@ -249,7 +249,7 @@ export default function CollectionScreen() {
       try {
         const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
         const parsed = raw ? JSON.parse(raw) : null;
-        const id = Number(parsed?.id);
+        const id = Number(parsed?.driver_id || parsed?.id || parsed?.user_id);
 
         setDriverId(id && !Number.isNaN(id) ? id : null);
         if (parsed?.name) {

@@ -72,8 +72,28 @@ export default function GodownLoadDetailScreen() {
     fetchLoadDetail();
   }, [rangeKey, fetchLoadDetail]);
 
+  const isTripActive = Boolean(
+    loadData?.isTripActive ||
+      (loadData?.tripId &&
+        (loadData?.tripStatus === "IN_PROGRESS" || !loadData?.tripEndedAt))
+  );
+  const isApproved = loadData?.status === "APPROVED";
+  const canApprove = Boolean(
+    loadData?.canApprove ??
+      (!isTripActive &&
+        !isApproved &&
+        (loadData?.status === "WAITING_APPROVAL" ||
+          loadData?.rawStatus === "PENDING"))
+  );
+
   const handleApprove = async () => {
-    if (loadData?.status !== "WAITING_APPROVAL") {
+    if (!canApprove || isApproved || isTripActive) {
+      if (isTripActive) {
+        Alert.alert(
+          "Trip In Progress",
+          "Approval is not available while the purchase trip is active. The purchase driver must complete End Trip first."
+        );
+      }
       return;
     }
 
@@ -82,8 +102,12 @@ export default function GodownLoadDetailScreen() {
       await approveStockInLoad(id);
       DeviceEventEmitter.emit("STOCK_IN_APPROVED", Number(id));
       router.back();
-    } catch (error) {
+    } catch (error: any) {
       console.log("Approve stock in error:", error);
+      const msg =
+        error?.response?.data?.message ||
+        "Failed to approve stock. Please try again.";
+      Alert.alert("Approval Failed", msg);
     } finally {
       setApproving(false);
     }
@@ -202,7 +226,30 @@ export default function GodownLoadDetailScreen() {
             value={loadData.driver}
           />
           <InfoRow icon="cube-outline" label="DEPOT" value={loadData.depot} />
+          {loadData.tripId ? (
+            <InfoRow
+              icon="navigate-outline"
+              label="TRIP"
+              value={`#${loadData.tripId} (${
+                isTripActive ? "IN PROGRESS" : "COMPLETED"
+              })`}
+            />
+          ) : null}
         </View>
+
+        {isTripActive && (
+          <View style={styles.tripAlertBanner}>
+            <Ionicons name="time-outline" size={20} color={DS.orangeText} />
+            <View style={styles.tripAlertTextContainer}>
+              <Text style={styles.tripAlertTitle}>
+                Purchase Trip #{loadData.tripId} In Progress
+              </Text>
+              <Text style={styles.tripAlertDesc}>
+                Stock approval is disabled while the trip is active. The purchase driver must complete End Trip before stock can be approved.
+              </Text>
+            </View>
+          </View>
+        )}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>ITEM-WISE STOCK</Text>
@@ -297,29 +344,50 @@ export default function GodownLoadDetailScreen() {
             </Text>
           </View>
         )}
-      </View>
 
-      <View style={styles.bottomAction}>
-        <TouchableOpacity
-          style={styles.approveButton}
-          onPress={handleApprove}
-          disabled={
-            approving ||
-            loadData.status === "APPROVED" ||
-            loadData.status !== "WAITING_APPROVAL"
-          }
-        >
-          <Ionicons name="checkmark" size={18} color={DS.white} />
-          <Text style={styles.approveText}>
-            {loadData.status === "APPROVED"
-              ? "Approved"
-              : loadData.status !== "WAITING_APPROVAL"
+        <View style={styles.bottomAction}>
+          <TouchableOpacity
+            style={[
+              styles.approveButton,
+              isApproved && styles.approveButtonDone,
+              (isTripActive || !canApprove) &&
+                !isApproved &&
+                styles.approveButtonDisabled,
+            ]}
+            onPress={handleApprove}
+            disabled={approving || !canApprove || isApproved || isTripActive}
+          >
+            <Ionicons
+              name={
+                isApproved
+                  ? "checkmark-done"
+                  : isTripActive
+                  ? "lock-closed-outline"
+                  : "checkmark"
+              }
+              size={18}
+              color={isApproved || canApprove ? DS.white : "#64748B"}
+            />
+            <Text
+              style={[
+                styles.approveText,
+                (isTripActive || !canApprove) &&
+                  !isApproved &&
+                  styles.approveTextDisabled,
+              ]}
+            >
+              {isApproved
+                ? "Approved"
+                : isTripActive
+                ? "Trip Active — Waiting for End Trip"
+                : !canApprove
                 ? "Waiting for submit"
                 : approving
-                  ? "Approving..."
-                  : `Approve All Stock (${loadData.qty})`}
-          </Text>
-        </TouchableOpacity>
+                ? "Approving..."
+                : `Approve All Stock (${loadData.qty})`}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScreenContainer>
   );
@@ -357,7 +425,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 130,
+    paddingBottom: 24,
   },
   pageHeader: {
     flexDirection: "row",
@@ -561,12 +629,8 @@ const styles = StyleSheet.create({
     color: DS.textSecondary,
   },
   bottomAction: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 72,
-    padding: 16,
-    backgroundColor: DS.surface,
+    marginTop: 20,
+    paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: DS.border,
   },
@@ -579,8 +643,45 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
+  approveButtonDisabled: {
+    backgroundColor: "#E2E8F0",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+  },
+  approveButtonDone: {
+    backgroundColor: DS.grey200,
+  },
   approveText: {
     ...TYPO.s2,
     color: DS.white,
+  },
+  approveTextDisabled: {
+    color: "#64748B",
+    fontWeight: WEIGHT.medium,
+  },
+  tripAlertBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: "#FFFBEB",
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    borderRadius: RADIUS.md,
+    padding: 12,
+    marginBottom: 12,
+    gap: 10,
+  },
+  tripAlertTextContainer: {
+    flex: 1,
+  },
+  tripAlertTitle: {
+    ...TYPO.s2,
+    color: "#92400E",
+    fontWeight: WEIGHT.semibold,
+  },
+  tripAlertDesc: {
+    ...TYPO.c1,
+    color: "#B45309",
+    marginTop: 2,
+    lineHeight: 16,
   },
 });

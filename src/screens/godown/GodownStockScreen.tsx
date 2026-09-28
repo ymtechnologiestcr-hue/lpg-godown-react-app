@@ -501,6 +501,14 @@ function LoadCard({
 }) {
   const approved = item.status === 'APPROVED';
   const cancelled = item.status === 'CANCELLED';
+  const tripActive = Boolean(
+    item.isTripActive || item.status === 'TRIP_IN_PROGRESS'
+  );
+  const badgeLabel = tripActive
+    ? 'TRIP IN PROGRESS'
+    : item.status === 'WAITING_APPROVAL'
+    ? 'WAITING APPROVAL'
+    : item.status;
 
   return (
     <TouchableOpacity
@@ -525,10 +533,12 @@ function LoadCard({
                     ? styles.approvedBadge
                     : cancelled
                     ? styles.cancelledBadge
+                    : tripActive
+                    ? styles.tripActiveBadge
                     : styles.pendingBadge,
                 ]}
               >
-                {item.status}
+                {badgeLabel}
               </Text>
             </View>
 
@@ -842,6 +852,10 @@ const styles = StyleSheet.create({
   cancelledBadge: {
     color: DS.red,
     backgroundColor: DS.redSoft,
+  },
+  tripActiveBadge: {
+    color: DS.primary,
+    backgroundColor: DS.primarySoft,
   },
   qtyBox: {
     alignItems: 'center',

@@ -5,7 +5,7 @@ import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import ToastManager from "../src/components/common/ToastManager";
-import { AppRole } from "../src/constants/appRole";
+import { APP_ROLES, AppRole } from "../src/constants/appRole";
 import {
   AUTH_TOKEN_KEY,
   AUTH_USER_KEY,
@@ -60,6 +60,10 @@ export default function RootLayout() {
 
   const inLogin = segments[0] === "login";
   const inWelcome = segments[0] === "welcome";
+  const isAtRoot =
+    !segments[0] ||
+    ((segments[0] as string) === "(tabs)" &&
+      (!segments[1] || (segments[1] as string) === "index"));
 
   if (loading) {
     return (
@@ -77,8 +81,13 @@ export default function RootLayout() {
     return <Redirect href="/welcome" />;
   }
 
-  if (isAuthenticated && (inLogin || inWelcome) && role) {
-    return <Redirect href={getHomeRouteByRole(role) as any} />;
+  if (isAuthenticated && role) {
+    if (inLogin || inWelcome) {
+      return <Redirect href={getHomeRouteByRole(role) as any} />;
+    }
+    if (isAtRoot && role !== APP_ROLES.DRIVER) {
+      return <Redirect href={getHomeRouteByRole(role) as any} />;
+    }
   }
 
   return (

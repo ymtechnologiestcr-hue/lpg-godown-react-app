@@ -57,6 +57,7 @@ export default function TabsLayout() {
 
   return (
     <Tabs
+      initialRouteName={isPurchase ? 'purchase-home' : isGodown ? 'godown-home' : 'index'}
       backBehavior="history"
       screenOptions={{
         headerShown: false,

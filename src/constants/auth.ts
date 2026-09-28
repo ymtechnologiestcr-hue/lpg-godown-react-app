@@ -5,10 +5,12 @@ export const AUTH_USER_KEY = 'auth_user';
 
 export type AuthUser = {
   id: number;
+  driver_id?: number | null;
   name: string;
   email: string;
   phone: string;
   role: AppRole;
+  agency_id?: number | null;
 };
 
 export const isSupportedMobileRole = (role: AppRole) => {

@@ -27,7 +27,8 @@ import AppHeader from "../components/common/AppHeader";
 import ScreenContainer from "../components/common/ScreenContainer";
 import ConfirmDeliveryModal from "../components/ui/ConfirmDeliveryModal";
 import DeliveryCard from "../components/ui/DeliveryCard";
-import { AUTH_USER_KEY } from "../constants/auth";
+import { APP_ROLES } from "../constants/appRole";
+import { AUTH_USER_KEY, getHomeRouteByRole } from "../constants/auth";
 import { DS, PALETTE, RADIUS, TYPO } from "../constants/designSystem";
 import { useDateRange } from "../context/DateRangeContext";
 import api from "../services/api";
@@ -169,7 +170,10 @@ export default function DeliveriesScreen() {
     try {
       const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
-      const id = Number(parsed?.id || parsed?.driver_id || parsed?.user_id);
+      if (parsed?.role && parsed.role !== APP_ROLES.DRIVER) {
+        return null;
+      }
+      const id = Number(parsed?.driver_id || parsed?.id || parsed?.user_id);
       if (id && !Number.isNaN(id)) {
         setDriverId(id);
         return id;
@@ -187,6 +191,13 @@ export default function DeliveriesScreen() {
           setLoading(true);
         }
         setError("");
+
+        const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed?.role && parsed.role !== APP_ROLES.DRIVER) {
+          router.replace(getHomeRouteByRole(parsed.role) as any);
+          return;
+        }
 
         const activeDriverId = await resolveDriverId();
 

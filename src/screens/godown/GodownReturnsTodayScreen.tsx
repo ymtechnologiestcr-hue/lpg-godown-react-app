@@ -1,24 +1,30 @@
-import { Ionicons } from '@expo/vector-icons';
-import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { Ionicons } from "@expo/vector-icons";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from "react-native";
 
-import AppHeader from '../../components/common/AppHeader';
-import ScreenContainer from '../../components/common/ScreenContainer';
-import { DS, TYPO, EYEBROW, RADIUS, WEIGHT } from '../../constants/designSystem';
-import { useDateRange } from '../../context/DateRangeContext';
+import AppHeader from "../../components/common/AppHeader";
+import ScreenContainer from "../../components/common/ScreenContainer";
+import {
+  DS,
+  EYEBROW,
+  RADIUS,
+  TYPO,
+  WEIGHT,
+} from "../../constants/designSystem";
+import { useDateRange } from "../../context/DateRangeContext";
 import {
   approveReturnByCondition,
   approveTransferEmptyReturn,
   getReturnsToday,
   getTransferEmptyReturns,
-} from '../../services/godownService';
+} from "../../services/godownService";
 
 export default function GodownReturnsTodayScreen() {
   const { rangeKey } = useDateRange();
@@ -27,7 +33,9 @@ export default function GodownReturnsTodayScreen() {
   const [loading, setLoading] = useState(false);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [approvingKey, setApprovingKey] = useState<string | null>(null);
-  const [approvingTransferId, setApprovingTransferId] = useState<number | null>(null);
+  const [approvingTransferId, setApprovingTransferId] = useState<number | null>(
+    null,
+  );
 
   const fetchReturns = async () => {
     try {
@@ -39,7 +47,7 @@ export default function GodownReturnsTodayScreen() {
       setReturns(Array.isArray(data) ? data : []);
       setTransferReturns(Array.isArray(transfers) ? transfers : []);
     } catch (error) {
-      console.log('Returns today error:', error);
+      console.log("Returns today error:", error);
     } finally {
       setLoading(false);
     }
@@ -51,7 +59,7 @@ export default function GodownReturnsTodayScreen() {
       await approveTransferEmptyReturn(id);
       await fetchReturns();
     } catch (error) {
-      console.log('Approve transfer empty return error:', error);
+      console.log("Approve transfer empty return error:", error);
     } finally {
       setApprovingTransferId(null);
     }
@@ -60,7 +68,7 @@ export default function GodownReturnsTodayScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchReturns();
-    }, [])
+    }, []),
   );
 
   useEffect(() => {
@@ -69,7 +77,7 @@ export default function GodownReturnsTodayScreen() {
 
   const handleApprove = async (
     driverId: number,
-    condition: 'empty' | 'normal' | 'defective'
+    condition: "empty" | "normal" | "defective",
   ) => {
     try {
       setApprovingKey(`${driverId}-${condition}`);
@@ -82,7 +90,7 @@ export default function GodownReturnsTodayScreen() {
       await fetchReturns();
       setOpenKey(null);
     } catch (error) {
-      console.log('Approve return error:', error);
+      console.log("Approve return error:", error);
     } finally {
       setApprovingKey(null);
     }
@@ -100,7 +108,8 @@ export default function GodownReturnsTodayScreen() {
         <View>
           <Text style={styles.title}>Returns Today</Text>
           <Text style={styles.subtitle}>
-            {returns.filter((x) => x.total > 0).length} drivers returned cylinders
+            {returns.filter((x) => x.total > 0).length} drivers returned
+            cylinders
           </Text>
         </View>
       </View>
@@ -114,114 +123,122 @@ export default function GodownReturnsTodayScreen() {
           {returns.filter((driver) => driver.total > 0).length === 0 &&
             transferReturns.length === 0 && (
               <View style={styles.emptyBox}>
-                <Text style={styles.emptyText}>No returns submitted today</Text>
+                <Text style={styles.emptyText}>No returns request now</Text>
               </View>
             )}
-          {returns.filter((driver) => driver.total > 0).map((driver) => (
-            <View key={driver.driver_id} style={styles.driverCard}>
-              <View style={styles.driverHeader}>
-                <View style={styles.avatar}>
-                  <Ionicons name="person-outline" size={22} color={DS.primary} />
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.driverName}>{driver.driver_name}</Text>
-                  <Text style={styles.driverTime}>
-                    Today, {formatTime(driver.time)}
-                  </Text>
-                </View>
-
-                <View style={styles.totalBox}>
-                  <Text style={styles.totalValue}>{driver.total}</Text>
-                  <Text style={styles.totalLabel}>TOTAL</Text>
-                </View>
-              </View>
-
-              <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeadText, { flex: 1.6 }]}>ITEM</Text>
-                <Text style={styles.emptyHead}>EMPTY</Text>
-                <Text style={styles.normalHead}>NORMAL</Text>
-                <Text style={styles.defHead}>DEF.</Text>
-              </View>
-
-              {groupItems(driver.items).map((item: any) => (
-                <View key={item.name} style={styles.itemRow}>
-                  <View style={styles.itemLeft}>
+          {returns
+            .filter((driver) => driver.total > 0)
+            .map((driver) => (
+              <View key={driver.driver_id} style={styles.driverCard}>
+                <View style={styles.driverHeader}>
+                  <View style={styles.avatar}>
                     <Ionicons
-                      name="cube-outline"
-                      size={16}
-                      color={DS.textSecondary}
+                      name="person-outline"
+                      size={22}
+                      color={DS.primary}
                     />
-
-                    <View>
-                      <Text style={styles.itemName}>{item.name}</Text>
-                      <Text style={styles.itemSub}>{item.category}</Text>
-                    </View>
                   </View>
 
-                  <Text style={styles.emptyValue}>{item.empty}</Text>
-                  <Text style={styles.normalValue}>{item.normal}</Text>
-                  <Text style={styles.defValue}>{item.defective}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.driverName}>{driver.driver_name}</Text>
+                    <Text style={styles.driverTime}>
+                      Today, {formatTime(driver.time)}
+                    </Text>
+                  </View>
+
+                  <View style={styles.totalBox}>
+                    <Text style={styles.totalValue}>{driver.total}</Text>
+                    <Text style={styles.totalLabel}>TOTAL</Text>
+                  </View>
                 </View>
-              ))}
 
-              <Text style={styles.approveLabel}>APPROVE BY CONDITION</Text>
+                <View style={styles.tableHeader}>
+                  <Text style={[styles.tableHeadText, { flex: 1.6 }]}>
+                    ITEM
+                  </Text>
+                  <Text style={styles.emptyHead}>EMPTY</Text>
+                  <Text style={styles.normalHead}>NORMAL</Text>
+                  <Text style={styles.defHead}>DEF.</Text>
+                </View>
 
-              <ApproveBox
-                title="Empty Cylinders"
-                count={driver.empty}
-                condition="empty"
-                color={DS.orange}
-                bg={DS.orangeSoft}
-                open={openKey === `${driver.driver_id}-empty`}
-                loading={approvingKey === `${driver.driver_id}-empty`}
-                onToggle={() =>
-                  setOpenKey(
-                    openKey === `${driver.driver_id}-empty`
-                      ? null
-                      : `${driver.driver_id}-empty`
-                  )
-                }
-                onApprove={() => handleApprove(driver.driver_id, 'empty')}
-              />
+                {groupItems(driver.items).map((item: any) => (
+                  <View key={item.name} style={styles.itemRow}>
+                    <View style={styles.itemLeft}>
+                      <Ionicons
+                        name="cube-outline"
+                        size={16}
+                        color={DS.textSecondary}
+                      />
 
-              <ApproveBox
-                title="Normal Cylinder"
-                count={driver.normal}
-                condition="normal"
-                color={DS.primary}
-                bg={DS.blueSoft}
-                open={openKey === `${driver.driver_id}-normal`}
-                loading={approvingKey === `${driver.driver_id}-normal`}
-                onToggle={() =>
-                  setOpenKey(
-                    openKey === `${driver.driver_id}-normal`
-                      ? null
-                      : `${driver.driver_id}-normal`
-                  )
-                }
-                onApprove={() => handleApprove(driver.driver_id, 'normal')}
-              />
+                      <View>
+                        <Text style={styles.itemName}>{item.name}</Text>
+                        <Text style={styles.itemSub}>{item.category}</Text>
+                      </View>
+                    </View>
 
-              <ApproveBox
-                title="Defective Cylinder"
-                count={driver.defective}
-                condition="defective"
-                color={DS.red}
-                bg={DS.redSoft}
-                open={openKey === `${driver.driver_id}-defective`}
-                loading={approvingKey === `${driver.driver_id}-defective`}
-                onToggle={() =>
-                  setOpenKey(
-                    openKey === `${driver.driver_id}-defective`
-                      ? null
-                      : `${driver.driver_id}-defective`
-                  )
-                }
-                onApprove={() => handleApprove(driver.driver_id, 'defective')}
-              />
-            </View>
-          ))}
+                    <Text style={styles.emptyValue}>{item.empty}</Text>
+                    <Text style={styles.normalValue}>{item.normal}</Text>
+                    <Text style={styles.defValue}>{item.defective}</Text>
+                  </View>
+                ))}
+
+                <Text style={styles.approveLabel}>APPROVE BY CONDITION</Text>
+
+                <ApproveBox
+                  title="Empty Cylinders"
+                  count={driver.empty}
+                  condition="empty"
+                  color={DS.orange}
+                  bg={DS.orangeSoft}
+                  open={openKey === `${driver.driver_id}-empty`}
+                  loading={approvingKey === `${driver.driver_id}-empty`}
+                  onToggle={() =>
+                    setOpenKey(
+                      openKey === `${driver.driver_id}-empty`
+                        ? null
+                        : `${driver.driver_id}-empty`,
+                    )
+                  }
+                  onApprove={() => handleApprove(driver.driver_id, "empty")}
+                />
+
+                <ApproveBox
+                  title="Normal Cylinder"
+                  count={driver.normal}
+                  condition="normal"
+                  color={DS.primary}
+                  bg={DS.blueSoft}
+                  open={openKey === `${driver.driver_id}-normal`}
+                  loading={approvingKey === `${driver.driver_id}-normal`}
+                  onToggle={() =>
+                    setOpenKey(
+                      openKey === `${driver.driver_id}-normal`
+                        ? null
+                        : `${driver.driver_id}-normal`,
+                    )
+                  }
+                  onApprove={() => handleApprove(driver.driver_id, "normal")}
+                />
+
+                <ApproveBox
+                  title="Defective Cylinder"
+                  count={driver.defective}
+                  condition="defective"
+                  color={DS.red}
+                  bg={DS.redSoft}
+                  open={openKey === `${driver.driver_id}-defective`}
+                  loading={approvingKey === `${driver.driver_id}-defective`}
+                  onToggle={() =>
+                    setOpenKey(
+                      openKey === `${driver.driver_id}-defective`
+                        ? null
+                        : `${driver.driver_id}-defective`,
+                    )
+                  }
+                  onApprove={() => handleApprove(driver.driver_id, "defective")}
+                />
+              </View>
+            ))}
 
           {transferReturns.length > 0 && (
             <>
@@ -242,7 +259,7 @@ export default function GodownReturnsTodayScreen() {
                       <Text style={styles.driverName}>{item.productName}</Text>
                       <Text style={styles.driverTime}>
                         Transfer #{item.transferId}
-                        {item.toCustomer ? ` · ${item.toCustomer}` : ''}
+                        {item.toCustomer ? ` · ${item.toCustomer}` : ""}
                       </Text>
                     </View>
 
@@ -259,7 +276,7 @@ export default function GodownReturnsTodayScreen() {
                   >
                     <Text style={styles.approveButtonText}>
                       {approvingTransferId === item.id
-                        ? 'Approving...'
+                        ? "Approving..."
                         : `Approve ${item.quantity} empty`}
                     </Text>
                   </TouchableOpacity>
@@ -298,11 +315,11 @@ function ApproveBox({
         <View style={[styles.conditionIcon, { backgroundColor: bg }]}>
           <Ionicons
             name={
-              condition === 'empty'
-                ? 'refresh-outline'
-                : condition === 'normal'
-                ? 'cube-outline'
-                : 'warning-outline'
+              condition === "empty"
+                ? "refresh-outline"
+                : condition === "normal"
+                  ? "cube-outline"
+                  : "warning-outline"
             }
             size={22}
             color={color}
@@ -315,7 +332,7 @@ function ApproveBox({
         </View>
 
         <Ionicons
-          name={open ? 'chevron-up' : 'chevron-down'}
+          name={open ? "chevron-up" : "chevron-down"}
           size={20}
           color={DS.textSecondary}
         />
@@ -334,9 +351,7 @@ function ApproveBox({
             disabled={loading || count <= 0}
           >
             <Text style={styles.approveButtonText}>
-              {loading
-                ? 'Approving...'
-                : `Approve ${count} ${condition}`}
+              {loading ? "Approving..." : `Approve ${count} ${condition}`}
             </Text>
           </TouchableOpacity>
         </>
@@ -366,11 +381,11 @@ const groupItems = (items: any[]) => {
 };
 
 const formatTime = (date?: string | null) => {
-  if (!date) return '--';
+  if (!date) return "--";
 
-  return new Date(date).toLocaleTimeString('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
+  return new Date(date).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
@@ -379,8 +394,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: DS.border,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 16,
     backgroundColor: DS.white,
   },
@@ -405,12 +420,12 @@ const styles = StyleSheet.create({
   },
   loaderBox: {
     height: 400,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyBox: {
     paddingVertical: 48,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyText: {
     ...TYPO.b2,
@@ -425,8 +440,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   driverHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 14,
   },
   avatar: {
@@ -434,8 +449,8 @@ const styles = StyleSheet.create({
     height: 42,
     borderRadius: RADIUS.md,
     backgroundColor: DS.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   driverName: {
@@ -448,7 +463,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   totalBox: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   totalValue: {
     ...TYPO.h5,
@@ -461,7 +476,7 @@ const styles = StyleSheet.create({
     color: DS.textSecondary,
   },
   tableHeader: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: DS.border,
@@ -478,7 +493,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.5,
     color: DS.orangeText,
-    textAlign: 'center',
+    textAlign: "center",
   },
   normalHead: {
     ...EYEBROW,
@@ -486,7 +501,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.5,
     color: DS.primary,
-    textAlign: 'center',
+    textAlign: "center",
   },
   defHead: {
     ...EYEBROW,
@@ -494,19 +509,19 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.5,
     color: DS.red,
-    textAlign: 'center',
+    textAlign: "center",
   },
   itemRow: {
     minHeight: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: DS.divider,
   },
   itemLeft: {
     flex: 1.6,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
   },
   itemName: {
@@ -523,21 +538,21 @@ const styles = StyleSheet.create({
     ...TYPO.b4,
     fontWeight: WEIGHT.semibold,
     width: 50,
-    textAlign: 'center',
+    textAlign: "center",
     color: DS.orangeText,
   },
   normalValue: {
     ...TYPO.b4,
     fontWeight: WEIGHT.semibold,
     width: 55,
-    textAlign: 'center',
+    textAlign: "center",
     color: DS.primary,
   },
   defValue: {
     ...TYPO.b4,
     fontWeight: WEIGHT.semibold,
     width: 42,
-    textAlign: 'center',
+    textAlign: "center",
     color: DS.red,
   },
   approveLabel: {
@@ -552,20 +567,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: RADIUS.md,
     marginBottom: 10,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   approveTop: {
     minHeight: 56,
     paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   conditionIcon: {
     width: 38,
     height: 38,
     borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
   },
   conditionTitle: {
@@ -580,8 +595,8 @@ const styles = StyleSheet.create({
   approveInnerRow: {
     paddingHorizontal: 14,
     paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   innerText: {
     ...TYPO.b4,
@@ -597,8 +612,8 @@ const styles = StyleSheet.create({
     height: 44,
     backgroundColor: DS.textPrimary,
     borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   approveButtonText: {
     ...TYPO.b4,
