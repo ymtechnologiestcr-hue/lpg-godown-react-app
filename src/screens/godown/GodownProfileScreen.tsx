@@ -15,6 +15,8 @@ import {
   TYPO,
   WEIGHT,
 } from "../../constants/designSystem";
+import { useAuth } from "../../context/AuthContext";
+import { showToast } from "../../components/common/ToastManager";
 
 const activities = [
   {
@@ -49,6 +51,7 @@ const activities = [
 
 export default function GodownProfileScreen() {
   const [user, setUser] = useState<any>(null);
+  const { logout } = useAuth();
 
   useEffect(() => {
     AsyncStorage.getItem(AUTH_USER_KEY).then((data) => {
@@ -59,8 +62,8 @@ export default function GodownProfileScreen() {
   }, []);
 
   const handleSignOut = async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
-    Alert.alert("Signed out", "You have been signed out successfully.");
+    await logout();
+    showToast("You have been signed out successfully.", "info");
     router.replace("/login");
   };
 

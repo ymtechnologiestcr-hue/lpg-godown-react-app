@@ -1,9 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TextInput,
@@ -11,14 +9,14 @@ import {
   View,
 } from 'react-native';
 
-import { APP_ROLE_KEY, AppRole } from '../constants/appRole';
+import { showToast } from '../components/common/ToastManager';
+import { AppRole } from '../constants/appRole';
 import {
-  AUTH_TOKEN_KEY,
-  AUTH_USER_KEY,
   getHomeRouteByRole,
   isSupportedMobileRole,
 } from '../constants/auth';
 import { DS, TYPO, RADIUS, WEIGHT } from '../constants/designSystem';
+import { useAuth } from '../context/AuthContext';
 import {
   identifyAuthMethod,
   loginWithPassword,
@@ -30,6 +28,7 @@ type AuthStep = 'IDENTIFIER' | 'METHOD' | 'PASSWORD' | 'OTP';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { login } = useAuth();
 
   const [step, setStep] = useState<AuthStep>('IDENTIFIER');
   const [identifier, setIdentifier] = useState('');
@@ -42,20 +41,24 @@ export default function LoginScreen() {
 
   const handleIdentify = async () => {
     if (!identifier.trim()) {
-      Alert.alert('Required', 'Enter email or phone number');
+      showToast('Enter email or phone number', 'error');
       return;
     }
 
     try {
       setLoading(true);
       const res = await identifyAuthMethod(identifier.trim());
+      if (res.data?.role && !isSupportedMobileRole(res.data.role as any)) {
+        showToast(`Role "${res.data.role}" is not supported. Use the cashier/admin web app.`, 'error');
+        return;
+      }
       setMasked(res.data?.masked || '');
       setAvailablePassword(Boolean(res.data?.availableMethods?.password));
       setAvailableOtp(Boolean(res.data?.availableMethods?.otp));
       setStep('METHOD');
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Unable to identify user';
-      Alert.alert('Login failed', message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -66,32 +69,33 @@ export default function LoginScreen() {
     user: { id: number; role: AppRole; name: string; email: string; phone: string };
   }) => {
     if (!isSupportedMobileRole(payload.user.role)) {
-      Alert.alert('Unsupported role', 'Use cashier web app for CASHIER login.');
+      showToast(`Role "${payload.user.role}" is not supported on this app.`, 'error');
       return;
     }
 
-    await AsyncStorage.setItem(AUTH_TOKEN_KEY, payload.token);
-    await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(payload.user));
-    await AsyncStorage.setItem(APP_ROLE_KEY, payload.user.role);
-
-    router.replace(getHomeRouteByRole(payload.user.role) as never);
+    await login(payload.token, payload.user as any);
+    showToast('Login successful!', 'success');
+    const destination = getHomeRouteByRole(payload.user.role);
+    router.replace(destination as never);
   };
 
   const handlePasswordLogin = async () => {
     if (!password.trim()) {
-      Alert.alert('Required', 'Enter password');
+      showToast('Enter password', 'error');
       return;
     }
 
     try {
       setLoading(true);
       const res = await loginWithPassword(identifier.trim(), password);
-      if (res.success) {
+      if (res.success && res.token && res.user) {
         await completeLogin({ token: res.token, user: res.user as any });
+      } else {
+        showToast(res.message || 'Login failed', 'error');
       }
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Unable to login with password';
-      Alert.alert('Login failed', message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -102,10 +106,10 @@ export default function LoginScreen() {
       setLoading(true);
       await requestOtp(identifier.trim());
       setStep('OTP');
-      Alert.alert('OTP sent', 'Enter the OTP to continue.');
+      showToast('OTP sent! Enter OTP to continue.', 'info');
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Unable to send OTP';
-      Alert.alert('OTP failed', message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -113,19 +117,21 @@ export default function LoginScreen() {
 
   const handleVerifyOtp = async () => {
     if (!otp.trim()) {
-      Alert.alert('Required', 'Enter OTP');
+      showToast('Enter OTP', 'error');
       return;
     }
 
     try {
       setLoading(true);
       const res = await verifyOtp(identifier.trim(), otp.trim());
-      if (res.success) {
+      if (res.success && res.token && res.user) {
         await completeLogin({ token: res.token, user: res.user as any });
+      } else {
+        showToast(res.message || 'Invalid OTP', 'error');
       }
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Invalid OTP';
-      Alert.alert('Login failed', message);
+      showToast(message, 'error');
     } finally {
       setLoading(false);
     }

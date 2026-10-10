@@ -24,6 +24,8 @@ import {
   TYPO,
   WEIGHT,
 } from "../constants/designSystem";
+import { useAuth } from "../context/AuthContext";
+import { showToast } from "../components/common/ToastManager";
 import { useDateRange } from "../context/DateRangeContext";
 import api from "../services/api";
 
@@ -158,6 +160,7 @@ const getStatusLabel = (status: string) => {
 };
 
 export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
+  const { logout } = useAuth();
   const { rangeKey } = useDateRange();
   const [driverId, setDriverId] = useState<number | null>(null);
   const [screenMode, setScreenMode] = useState<"PROFILE" | "BOOKINGS">(
@@ -271,8 +274,9 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
   }, [driverId, fetchProfileHistory, fetchBookings, page, rangeKey]);
 
   const handleSignOut = async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
+    await logout();
     if (onRoleChange) onRoleChange();
+    showToast("Signed out successfully", "info");
     router.replace("/login");
   };
 

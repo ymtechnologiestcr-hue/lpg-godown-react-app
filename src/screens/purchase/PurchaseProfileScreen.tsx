@@ -6,10 +6,13 @@ import { useEffect, useState } from 'react';
 
 import ScreenContainer from '../../components/common/ScreenContainer';
 import { AUTH_TOKEN_KEY, AUTH_USER_KEY } from '../../constants/auth';
+import { showToast } from '../../components/common/ToastManager';
+import { useAuth } from '../../context/AuthContext';
 import { DS, TYPO, EYEBROW, RADIUS, PALETTE, WEIGHT } from '../../constants/designSystem';
 
 export default function PurchaseProfileScreen() {
   const [user, setUser] = useState<any>(null);
+  const { logout } = useAuth();
 
   useEffect(() => {
     AsyncStorage.getItem(AUTH_USER_KEY).then((data) => {
@@ -20,9 +23,9 @@ export default function PurchaseProfileScreen() {
   }, []);
 
   const handleSignOut = async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY]);
+    await logout();
     DeviceEventEmitter.emit('APP_ROLE_CHANGED', null);
-    Alert.alert('Signed out', 'You have been signed out successfully.');
+    showToast('You have been signed out successfully.', 'info');
     router.replace('/login');
   };
 
