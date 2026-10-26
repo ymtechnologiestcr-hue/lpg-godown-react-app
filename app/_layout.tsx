@@ -10,7 +10,7 @@ import { DateRangeProvider } from "../src/context/DateRangeContext";
 
 function RootNavigation() {
   const segments = useSegments();
-  const { isAuthenticated, role, isLoading } = useAuth();
+  const { isAuthenticated, role, isLoading, isSplashCompleted } = useAuth();
 
   const inLogin = segments[0] === "login";
   const inWelcome = segments[0] === "welcome";
@@ -29,12 +29,29 @@ function RootNavigation() {
     );
   }
 
-  if (!isAuthenticated && !inLogin && !inWelcome) {
+  // While on the welcome/splash screen, ALWAYS render Stack so it can animate and navigate
+  if (inWelcome) {
+    return (
+      <>
+        <Stack screenOptions={{ headerShown: false }} />
+        <ToastManager />
+      </>
+    );
+  }
+
+  // 1. Initial app start: if splash has not completed, redirect to /welcome
+  if (!isSplashCompleted) {
     return <Redirect href="/welcome" />;
   }
 
+  // 2. After splash: unauthenticated users redirect to /login
+  if (!isAuthenticated && !inLogin) {
+    return <Redirect href="/login" />;
+  }
+
+  // 3. Authenticated users: redirect away from login and root to home route
   if (isAuthenticated && role) {
-    if (inLogin || inWelcome) {
+    if (inLogin) {
       return <Redirect href={getHomeRouteByRole(role) as any} />;
     }
     if (isAtRoot && role !== APP_ROLES.DRIVER) {

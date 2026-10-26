@@ -184,10 +184,11 @@ const styles = StyleSheet.create({
   },
   scrollArea: {
     marginTop: 8,
-    flexShrink: 1,
+    flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    flexGrow: 1,
+    paddingBottom: 40,
   },
   handle: {
     width: 64,

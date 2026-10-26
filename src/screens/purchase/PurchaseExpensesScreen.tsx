@@ -128,7 +128,7 @@ export default function PurchaseExpensesScreen() {
 
         const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
-          quality: 0.6,
+          quality: 0.95,
         });
 
         if (!result.canceled) {
@@ -146,7 +146,7 @@ export default function PurchaseExpensesScreen() {
 
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.6,
+        quality: 0.95,
       });
 
       if (!result.canceled) {

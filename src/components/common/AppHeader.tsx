@@ -13,8 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { AUTH_USER_KEY } from "../../constants/auth";
+import { AGENCY_NAME_KEY, AUTH_USER_KEY } from "../../constants/auth";
 import { DS, RADIUS, TYPO, WEIGHT } from "../../constants/designSystem";
+import { useAuth } from "../../context/AuthContext";
 import { useDateRange } from "../../context/DateRangeContext";
 
 const WebDateInput: any = "input";
@@ -23,23 +24,42 @@ const userAvatarUrl = require("../../../assets/images/driverimage.jpeg");
 
 export default function AppHeader() {
   const { range, setRange, resetToToday } = useDateRange();
+  const { user, agencyName: contextAgencyName } = useAuth();
 
   const [userName, setUserName] = useState("");
+  const [storedAgencyName, setStoredAgencyName] = useState("");
 
   useEffect(() => {
-    const loadUserName = async () => {
+    const loadUserData = async () => {
       try {
-        const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
-        const parsed = raw ? JSON.parse(raw) : null;
+        const [rawUser, rawAgency] = await Promise.all([
+          AsyncStorage.getItem(AUTH_USER_KEY),
+          AsyncStorage.getItem(AGENCY_NAME_KEY),
+        ]);
+        const parsed = rawUser ? JSON.parse(rawUser) : null;
         const name = typeof parsed?.name === "string" ? parsed.name.trim() : "";
         setUserName(name);
+
+        const agency =
+          (typeof rawAgency === "string" && rawAgency.trim()) ||
+          (typeof parsed?.agency_name === "string" && parsed.agency_name.trim()) ||
+          (typeof parsed?.company_name === "string" && parsed.company_name.trim()) ||
+          "";
+        setStoredAgencyName(agency);
       } catch {
         setUserName("");
+        setStoredAgencyName("");
       }
     };
 
-    loadUserName();
+    loadUserData();
   }, []);
+
+  const displayAgencyName =
+    contextAgencyName?.trim() ||
+    user?.agency_name?.trim() ||
+    user?.company_name?.trim() ||
+    storedAgencyName;
 
   const [modalVisible, setModalVisible] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<"start" | "end">("start");
@@ -193,7 +213,14 @@ export default function AppHeader() {
           <Text style={styles.name}>Hi {userName || "User"} !</Text>
         </View>
 
-
+        {Boolean(displayAgencyName) && (
+          <View style={styles.agencyWrap}>
+            <Ionicons name="business-outline" size={14} color={DS.primary} />
+            <Text style={styles.agencyName} numberOfLines={1}>
+              {displayAgencyName}
+            </Text>
+          </View>
+        )}
       </View>
 
       <Modal
@@ -302,6 +329,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    flexShrink: 1,
   },
   avatarWrap: {
     width: 36,
@@ -315,6 +343,22 @@ const styles = StyleSheet.create({
   name: {
     ...TYPO.s1,
     color: "#0B0D12",
+  },
+  agencyWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: DS.primarySoft,
+    borderRadius: RADIUS.pill,
+    maxWidth: "50%",
+    marginLeft: 8,
+  },
+  agencyName: {
+    ...TYPO.c2,
+    fontWeight: WEIGHT.semibold,
+    color: DS.primary,
   },
   iconRow: {
     flexDirection: "row",

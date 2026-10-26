@@ -2,6 +2,7 @@ import { APP_ROLES, AppRole } from './appRole';
 
 export const AUTH_TOKEN_KEY = 'auth_token';
 export const AUTH_USER_KEY = 'auth_user';
+export const AGENCY_NAME_KEY = 'agency_name';
 
 export type AuthUser = {
   id: number;
@@ -11,6 +12,8 @@ export type AuthUser = {
   phone: string;
   role: AppRole;
   agency_id?: number | null;
+  agency_name?: string | null;
+  company_name?: string | null;
 };
 
 export const isSupportedMobileRole = (role: AppRole) => {

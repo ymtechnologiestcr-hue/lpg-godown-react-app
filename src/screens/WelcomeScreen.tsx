@@ -3,15 +3,30 @@ import { useEffect, useRef } from "react";
 import {
   Animated,
   Easing,
+  Pressable,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getHomeRouteByRole } from "../constants/auth";
+import { useAuth } from "../context/AuthContext";
 
 export default function WelcomeScreen() {
   const router = useRouter();
+  const { isAuthenticated, user, role, agencyName, setSplashCompleted } =
+    useAuth();
+
+  // Dynamic Agency Name:
+  // Case 1: When user is logged in -> show user's agency name
+  // Case 2: When user is not logged in -> show "LPG Mitra"
+  const displayAgencyName =
+    isAuthenticated && (user?.agency_name || user?.company_name || agencyName)
+      ? (user?.agency_name || user?.company_name || agencyName)!.trim()
+      : "LPG Mitra";
+
+  const logoInitial = (displayAgencyName.trim().charAt(0) || "G").toUpperCase();
 
   // Animation Values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -23,18 +38,38 @@ export default function WelcomeScreen() {
   const pulseScale = useRef(new Animated.Value(1)).current;
 
   const isNavigating = useRef(false);
+  const authRef = useRef({ isAuthenticated, role });
+  useEffect(() => {
+    authRef.current = { isAuthenticated, role };
+  }, [isAuthenticated, role]);
 
-  const navigateToLogin = () => {
+  const navigateNext = () => {
     if (isNavigating.current) return;
     isNavigating.current = true;
 
+    let hasNavigated = false;
+    const performNavigation = () => {
+      if (hasNavigated) return;
+      hasNavigated = true;
+      setSplashCompleted(true);
+      const { isAuthenticated: authed, role: userRole } = authRef.current;
+      if (authed && userRole) {
+        router.replace(getHomeRouteByRole(userRole) as any);
+      } else {
+        router.replace("/login");
+      }
+    };
+
     Animated.timing(fadeAnim, {
       toValue: 0,
-      duration: 350,
-      useNativeDriver: false, // safer for web
+      duration: 300,
+      useNativeDriver: false,
     }).start(() => {
-      router.replace("/login");
+      performNavigation();
     });
+
+    // Safety fallback in case animation does not trigger completion
+    setTimeout(performNavigation, 380);
   };
 
   useEffect(() => {
@@ -103,16 +138,16 @@ export default function WelcomeScreen() {
       useNativeDriver: false,
     }).start();
 
-    // 5. Auto navigate to Login after 2.8 seconds
+    // 5. Auto navigate after 2.6 seconds
     const timer = setTimeout(() => {
-      navigateToLogin();
-    }, 2800);
+      navigateNext();
+    }, 2600);
 
     return () => clearTimeout(timer);
   }, []);
 
   return (
-    <View style={styles.mainContainer}>
+    <Pressable style={styles.mainContainer} onPress={navigateNext}>
       <StatusBar barStyle="light-content" backgroundColor="#1E65FF" />
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
         <SafeAreaView style={styles.safeArea}>
@@ -129,7 +164,7 @@ export default function WelcomeScreen() {
             >
               <Animated.View style={{ transform: [{ scale: pulseScale }] }}>
                 <View style={styles.logoCircle}>
-                  <Text style={styles.logoText}>S</Text>
+                  <Text style={styles.logoText}>{logoInitial}</Text>
                 </View>
               </Animated.View>
             </Animated.View>
@@ -144,7 +179,7 @@ export default function WelcomeScreen() {
                 },
               ]}
             >
-              <Text style={styles.titleText}>Sooraj Gas Agency</Text>
+              <Text style={styles.titleText}>{displayAgencyName}</Text>
             </Animated.View>
           </View>
 
@@ -157,7 +192,7 @@ export default function WelcomeScreen() {
           </Animated.View>
         </SafeAreaView>
       </Animated.View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -211,6 +246,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
     letterSpacing: 0.3,
+    textAlign: "center",
+    paddingHorizontal: 24,
   },
   footerSection: {
     alignItems: "center",

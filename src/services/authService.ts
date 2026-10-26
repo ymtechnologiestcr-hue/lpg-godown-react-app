@@ -24,6 +24,9 @@ type LoginResponse = {
     phone: string;
     role: "DRIVER" | "GODOWN_MANAGER" | "PURCHASE_MANAGER" | "CASHIER";
     status: "ACTIVE" | "INACTIVE";
+    agency_id?: number | null;
+    agency_name?: string | null;
+    company_name?: string | null;
   };
   message?: string;
 };
@@ -58,3 +61,20 @@ export const verifyOtp = async (identifier: string, otp: string) => {
   });
   return res.data;
 };
+
+export const fetchUserSettings = async (userId: number) => {
+  const res = await api.get<{
+    success: boolean;
+    data: {
+      id: number;
+      name: string;
+      agency_name?: string | null;
+      company_name?: string | null;
+      email?: string | null;
+      phone?: string | null;
+      role: string;
+    };
+  }>(`/users/${userId}/settings`);
+  return res.data;
+};
+

@@ -1860,15 +1860,14 @@ function ConfirmNewSaleModal({
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.fullScreenOverlay} edges={["top"]}>
-        <TouchableWithoutFeedback onPress={() => {}}>
-          <View
-            style={[
-              styles.confirmSaleSheet,
-              {
-                marginBottom: keyboardHeight,
-              },
-            ]}
-          >
+        <View
+          style={[
+            styles.confirmSaleSheet,
+            {
+              marginBottom: keyboardHeight,
+            },
+          ]}
+        >
             <ScrollView
               style={styles.confirmSaleScroll}
               keyboardShouldPersistTaps="handled"
@@ -2082,7 +2081,6 @@ function ConfirmNewSaleModal({
               </View>
             </ScrollView>
           </View>
-        </TouchableWithoutFeedback>
       </SafeAreaView>
     </Modal>
   );
@@ -2613,9 +2611,10 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   confirmSaleScroll: {
-    flexShrink: 1,
+    flex: 1,
   },
   confirmSaleScrollContent: {
+    flexGrow: 1,
     paddingBottom: 100,
   },
   customerPreviewBox: {
