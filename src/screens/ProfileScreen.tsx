@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   RefreshControl,
@@ -27,6 +28,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { showToast } from "../components/common/ToastManager";
 import { useDateRange } from "../context/DateRangeContext";
+import { useNetwork } from "../context/NetworkContext";
 import api from "../services/api";
 
 type DriverProfileDelivery = {
@@ -162,6 +164,7 @@ const getStatusLabel = (status: string) => {
 export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
   const { logout } = useAuth();
   const { rangeKey } = useDateRange();
+  const { pendingCount, setOfflineModalOpen } = useNetwork();
   const [driverId, setDriverId] = useState<number | null>(null);
   const [screenMode, setScreenMode] = useState<"PROFILE" | "BOOKINGS">(
     "PROFILE",
@@ -274,6 +277,31 @@ export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
   }, [driverId, fetchProfileHistory, fetchBookings, page, rangeKey]);
 
   const handleSignOut = async () => {
+    if (pendingCount > 0) {
+      Alert.alert(
+        "Unsynced Deliveries",
+        `You have ${pendingCount} offline action(s) waiting to sync. If you sign out now, these unsynced actions may be lost.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "View & Sync",
+            onPress: () => setOfflineModalOpen(true),
+          },
+          {
+            text: "Sign Out Anyway",
+            style: "destructive",
+            onPress: async () => {
+              await logout();
+              if (onRoleChange) onRoleChange();
+              showToast("Signed out successfully", "info");
+              router.replace("/login");
+            },
+          },
+        ],
+      );
+      return;
+    }
+
     await logout();
     if (onRoleChange) onRoleChange();
     showToast("Signed out successfully", "info");

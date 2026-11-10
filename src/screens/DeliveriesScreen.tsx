@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -25,13 +25,19 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppHeader from "../components/common/AppHeader";
 import ScreenContainer from "../components/common/ScreenContainer";
+import { showToast } from "../components/common/ToastManager";
 import ConfirmDeliveryModal from "../components/ui/ConfirmDeliveryModal";
 import DeliveryCard from "../components/ui/DeliveryCard";
 import { APP_ROLES } from "../constants/appRole";
 import { AUTH_USER_KEY, getHomeRouteByRole } from "../constants/auth";
 import { DS, PALETTE, RADIUS, TYPO } from "../constants/designSystem";
 import { useDateRange } from "../context/DateRangeContext";
+import { useNetwork } from "../context/NetworkContext";
 import api from "../services/api";
+import { networkMonitor } from "../services/network/networkMonitor";
+import { deliveryCache } from "../services/offline/deliveryCache";
+import { offlineQueue } from "../services/offline/offlineQueue";
+import { syncEngine } from "../services/offline/syncEngine";
 import { DriverDeliveriesResponse, DriverDeliveryItem } from "../types";
 
 type FinderMode = "NUMBER" | "SCAN" | "QR";
@@ -99,11 +105,16 @@ const formatSize = (batch: BatchItem) => {
 export default function DeliveriesScreen() {
   const router = useRouter();
   const { range, rangeKey } = useDateRange();
+  const rangeStartDate = range?.startDate;
+  const rangeEndDate = range?.endDate;
+  const { isOnline, isSlowNetwork, syncNow } = useNetwork();
   const [driverId, setDriverId] = useState<number | null>(null);
+  const driverIdRef = useRef<number | null>(driverId);
 
   const [dashboard, setDashboard] = useState<DriverDeliveriesResponse | null>(
     null,
   );
+  const dashboardRef = useRef(dashboard);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -165,8 +176,12 @@ export default function DeliveriesScreen() {
 
   const [permission, requestPermission] = useCameraPermissions();
 
+  useEffect(() => {
+    dashboardRef.current = dashboard;
+  }, [dashboard]);
+
   const resolveDriverId = useCallback(async (): Promise<number | null> => {
-    if (driverId) return driverId;
+    if (driverIdRef.current) return driverIdRef.current;
     try {
       const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
@@ -175,6 +190,7 @@ export default function DeliveriesScreen() {
       }
       const id = Number(parsed?.driver_id || parsed?.id || parsed?.user_id);
       if (id && !Number.isNaN(id)) {
+        driverIdRef.current = id;
         setDriverId(id);
         return id;
       }
@@ -182,7 +198,7 @@ export default function DeliveriesScreen() {
     } catch {
       return null;
     }
-  }, [driverId]);
+  }, []);
 
   const fetchDeliveries = useCallback(
     async (isSilent = false) => {
@@ -206,34 +222,73 @@ export default function DeliveriesScreen() {
           return;
         }
 
+        // 1. Instantly load cached deliveries first so the driver is never blocked by network latency
+        const cached = await deliveryCache.getCachedDeliveries(activeDriverId);
+        const pending = await offlineQueue.getPendingActions();
+        if (cached) {
+          const merged = deliveryCache.mergePendingActions(cached, pending);
+          setDashboard(merged);
+          if (!isSilent) {
+            setLoading(false);
+          }
+        }
+
+        // 2. If completely offline, don't attempt network fetch
+        const netState = networkMonitor.getState();
+        if (!netState.isOnline || netState.isSimulatedOffline) {
+          if (!cached) {
+            setError("No connection and no local delivery data found");
+          }
+          return;
+        }
+
         const params = new URLSearchParams();
-        if (range?.startDate && range?.endDate) {
-          params.append("startDate", range.startDate);
-          params.append("endDate", range.endDate);
+        if (rangeStartDate && rangeEndDate) {
+          params.append("startDate", rangeStartDate);
+          params.append("endDate", rangeEndDate);
         }
         const queryStr = params.toString() ? `?${params.toString()}` : "";
 
         const response = await api.get(
           `/drivers/${activeDriverId}/app-deliveries${queryStr}`,
+          // Allow for a cold backend / slow connection; the cache is already
+          // rendered while this request completes.
+          { timeout: 30000 },
         );
 
         if (response.data?.success) {
-          setDashboard(response.data.data);
-        } else {
+          await deliveryCache.saveDeliveries(activeDriverId, response.data.data);
+          const currentPending = await offlineQueue.getPendingActions();
+          const mergedWithPending = deliveryCache.mergePendingActions(
+            response.data.data,
+            currentPending,
+          );
+          setDashboard(mergedWithPending);
+        } else if (!cached) {
           setError("Failed to load deliveries");
         }
       } catch (err: any) {
-        console.error(
+        console.warn(
           "fetchDeliveries error:",
           err?.response?.data || err.message,
         );
-        setError("Failed to load deliveries");
+        // If we don't have any cached data displayed, show error
+        if (!dashboardRef.current) {
+          setError("Failed to load deliveries");
+        }
       } finally {
         setLoading(false);
       }
     },
-    [resolveDriverId, range],
+    [resolveDriverId, rangeStartDate, rangeEndDate],
   );
+
+  useEffect(() => {
+    const unsub = syncEngine.onSyncComplete(() => {
+      fetchDeliveries(true);
+    });
+    return unsub;
+  }, [fetchDeliveries]);
 
   useFocusEffect(
     useCallback(() => {
@@ -258,25 +313,96 @@ export default function DeliveriesScreen() {
   }) => {
     if (!selectedSale) return;
 
-    try {
-      setConfirmLoading(true);
+    const activeDriverId = (await resolveDriverId()) || driverId;
+    const saleToConfirm = selectedSale;
+    const isLowNetwork = !isOnline || isSlowNetwork;
 
-      await api.put(`/drivers/sale/${selectedSale.saleId}/deliver`, {
-        payment_method: payload.payment_method,
-        empty_cylinder_qty: payload.empty_cylinder_qty,
-        empty_product_id: 8,
-        created_by: 7,
-      });
+    const saveOfflineAndProceed = async (reason?: string) => {
+      if (activeDriverId) {
+        await offlineQueue.enqueue({
+          type: "CONFIRM_DELIVERY",
+          endpoint: `/drivers/sale/${saleToConfirm.saleId}/deliver`,
+          method: "PUT",
+          payload: {
+            payment_method: payload.payment_method,
+            empty_cylinder_qty: payload.empty_cylinder_qty,
+            empty_product_id: 8,
+            created_by: 7,
+          },
+          metadata: {
+            title: `Delivery: ${saleToConfirm.customerName}`,
+            subtitle: `${payload.payment_method} ₹${saleToConfirm.totalAmount} • ${payload.empty_cylinder_qty} Empty`,
+            customerName: saleToConfirm.customerName,
+            saleId: saleToConfirm.saleId,
+            amount: saleToConfirm.totalAmount,
+            emptyCylinderQty: payload.empty_cylinder_qty,
+            createdAt: new Date().toISOString(),
+            driverId: activeDriverId,
+          },
+        });
+
+        // Optimistically update local cache and state
+        const updated = await deliveryCache.applyOptimisticDelivery(
+          activeDriverId,
+          saleToConfirm.saleId,
+          payload,
+        );
+        if (updated) {
+          setDashboard(updated);
+        }
+      }
 
       setConfirmVisible(false);
       setSelectedSale(null);
-      await fetchDeliveries();
-    } catch (err: any) {
-      console.error(
-        "Confirm delivery error:",
-        err?.response?.data || err.message,
+      showToast(
+        reason || "Delivery saved offline! Will sync automatically when connection recovers.",
+        "info",
       );
-      Alert.alert("Error", err?.response?.data?.message || "Failed to confirm");
+      if (isOnline) {
+        syncNow();
+      }
+    };
+
+    // If slow network or offline, save immediately without keeping driver waiting
+    if (isLowNetwork) {
+      await saveOfflineAndProceed();
+      return;
+    }
+
+    try {
+      setConfirmLoading(true);
+
+      await api.put(
+        `/drivers/sale/${saleToConfirm.saleId}/deliver`,
+        {
+          payment_method: payload.payment_method,
+          empty_cylinder_qty: payload.empty_cylinder_qty,
+          empty_product_id: 8,
+          created_by: 7,
+        },
+        { timeout: 7000 },
+      );
+
+      setConfirmVisible(false);
+      setSelectedSale(null);
+      await fetchDeliveries(true);
+    } catch (err: any) {
+      console.warn("Confirm delivery API error:", err?.response?.data || err.message);
+
+      const isNetworkIssue =
+        !err.response ||
+        err.code === "ECONNABORTED" ||
+        err.message?.includes("timeout") ||
+        err.message?.includes("Network Error");
+
+      if (isNetworkIssue) {
+        // Fallback to offline queue smoothly
+        await saveOfflineAndProceed(
+          "Poor network detected — delivery saved locally and will sync in background.",
+        );
+      } else {
+        Alert.alert("Error", err?.response?.data?.message || "Failed to confirm");
+      }
     } finally {
       setConfirmLoading(false);
     }
@@ -337,21 +463,32 @@ export default function DeliveriesScreen() {
     try {
       setBatchLoading(true);
 
+      // Load cached batches first
+      const cachedBatches = await deliveryCache.getCachedBatches(activeDriverId);
+      if (cachedBatches && cachedBatches.length > 0) {
+        setAvailableBatches(cachedBatches);
+      }
+
+      if (!isOnline) {
+        return;
+      }
+
       const response = await api.get(
         `/drivers/${activeDriverId}/available-batches`,
+        { timeout: 7000 },
       );
 
       if (response.data?.success) {
-        setAvailableBatches(response.data.data || []);
-      } else {
-        setAvailableBatches([]);
+        const batches = response.data.data || [];
+        setAvailableBatches(batches);
+        await deliveryCache.saveBatches(activeDriverId, batches);
       }
     } catch (err: any) {
-      console.error(
-        "fetchAvailableBatches error:",
-        err?.response?.data || err.message,
-      );
-      setAvailableBatches([]);
+      console.warn("fetchAvailableBatches error:", err?.response?.data || err.message);
+      const cachedBatches = await deliveryCache.getCachedBatches(activeDriverId);
+      if (cachedBatches && cachedBatches.length > 0) {
+        setAvailableBatches(cachedBatches);
+      }
     } finally {
       setBatchLoading(false);
     }
@@ -368,19 +505,31 @@ export default function DeliveriesScreen() {
     try {
       setFindingCustomer(true);
 
-      const response = await api.get(
-        `/drivers/customers/find?query=${encodeURIComponent(searchValue)}`,
-      );
-
-      if (response.data?.success && response.data?.data) {
-        const customer = response.data.data;
-
+      const setupCustomerFound = async (customer: {
+        id?: number | null;
+        name: string;
+        phone: string;
+        address?: string;
+        productType?: string;
+        quantity?: number;
+      }) => {
+        const validId = customer.id && Number(customer.id) > 0 ? Number(customer.id) : null;
         setFoundCustomer({
-          id: Number(customer.id),
+          id: validId as any,
           name: customer.name || "",
           phone: customer.phone || "",
           address: customer.address || "",
-          productType: customer.productType || customer.type || "Domestic",
+          productType: customer.productType || "Domestic",
+          quantity: Number(customer.quantity || 1),
+        });
+
+        // Cache customer record
+        await deliveryCache.cacheCustomer({
+          id: validId as any,
+          name: customer.name || "",
+          phone: customer.phone || "",
+          address: customer.address || "",
+          productType: customer.productType || "Domestic",
           quantity: Number(customer.quantity || 1),
         });
 
@@ -388,7 +537,7 @@ export default function DeliveriesScreen() {
         resetCreateSaleForm();
 
         const defaultCategory: ReturnCategory = String(
-          customer.productType || customer.type || "",
+          customer.productType || "",
         )
           .toUpperCase()
           .includes("COMMERCIAL")
@@ -399,21 +548,89 @@ export default function DeliveriesScreen() {
 
         await fetchAvailableBatches();
         setBatchModalVisible(true);
-      } else {
-        Alert.alert(
-          "Not found",
-          response.data?.message || "Customer not found",
+      };
+
+      // 1. If completely offline, search offline cache and assigned deliveries
+      if (!isOnline) {
+        const cachedCustomer = await deliveryCache.findCachedCustomer(searchValue);
+        if (cachedCustomer) {
+          await setupCustomerFound(cachedCustomer);
+          showToast("Customer found from offline records", "info");
+          return;
+        }
+
+        const match = dashboard?.deliveries?.find(
+          (d) =>
+            d.consumerNumber?.includes(searchValue) ||
+            d.customerName?.toLowerCase().includes(searchValue.toLowerCase()),
         );
+
+        if (match) {
+          await setupCustomerFound({
+            id: match.customerId || null,
+            name: match.customerName,
+            phone: searchValue,
+            address: match.address,
+            productType: match.cylinderType || "Domestic",
+            quantity: match.quantity || 1,
+          });
+          showToast("Customer matched from assigned deliveries", "info");
+          return;
+        }
+
+        Alert.alert(
+          "Offline Search",
+          "No local record found for this number. Search requires network when customer is not cached.",
+        );
+        return;
+      }
+
+      // 2. Online search with fallback
+      const response = await api.get(
+        `/drivers/customers/find?query=${encodeURIComponent(searchValue)}`,
+        { timeout: 7000 },
+      );
+
+      if (response.data?.success && response.data?.data) {
+        const customer = response.data.data;
+        await setupCustomerFound({
+          id: Number(customer.id),
+          name: customer.name || "",
+          phone: customer.phone || "",
+          address: customer.address || "",
+          productType: customer.productType || customer.type || "Domestic",
+          quantity: Number(customer.quantity || 1),
+        });
+      } else {
+        const cachedCustomer = await deliveryCache.findCachedCustomer(searchValue);
+        if (cachedCustomer) {
+          await setupCustomerFound(cachedCustomer);
+          showToast("Customer found from offline records", "info");
+        } else {
+          Alert.alert("Not found", response.data?.message || "Customer not found");
+        }
       }
     } catch (err: any) {
-      console.error(
-        "handleFindCustomer error:",
-        err?.response?.data || err.message,
-      );
-      Alert.alert(
-        "Error",
-        err?.response?.data?.message || "Customer not found",
-      );
+      console.warn("handleFindCustomer error:", err?.response?.data || err.message);
+      const cachedCustomer = await deliveryCache.findCachedCustomer(searchValue);
+      if (cachedCustomer) {
+        setFoundCustomer({
+          id: Number(cachedCustomer.id),
+          name: cachedCustomer.name,
+          phone: cachedCustomer.phone,
+          address: cachedCustomer.address || "",
+          productType: cachedCustomer.productType || "Domestic",
+          quantity: Number(cachedCustomer.quantity || 1),
+        });
+        handleCloseFinder();
+        resetCreateSaleForm();
+        setTransactionType("SALE");
+        await fetchAvailableBatches();
+        setBatchModalVisible(true);
+        showToast("Loaded customer from offline cache", "info");
+      } else {
+        Alert.alert("Error", "Could not reach server and no offline record was found");
+      }
     } finally {
       setFindingCustomer(false);
     }
@@ -508,7 +725,7 @@ export default function DeliveriesScreen() {
         return;
       }
 
-      await api.post("/drivers/returns", {
+      const returnPayload = {
         driver_id: activeDriverId,
         customer_name: foundCustomer.name,
         phone: foundCustomer.phone,
@@ -524,25 +741,106 @@ export default function DeliveriesScreen() {
         amount: returnCategory === "COMMERCIAL" ? Number(returnAmount || 0) : 0,
 
         otp: returnOtp,
-      });
+      };
+
+      const isLowNetwork = !isOnline || isSlowNetwork;
+
+      const saveReturnOffline = async (reason?: string) => {
+        await offlineQueue.enqueue({
+          type: "CREATE_RETURN",
+          endpoint: "/drivers/returns",
+          method: "POST",
+          payload: returnPayload,
+          metadata: {
+            title: `Customer Return: ${foundCustomer.name}`,
+            subtitle: `${returnCategory} • Qty: ${returnQty}`,
+            customerName: foundCustomer.name,
+            quantity: returnQty,
+            createdAt: new Date().toISOString(),
+            driverId: activeDriverId,
+          },
+        });
+
+        setBatchModalVisible(false);
+        setPendingCreateSaleOpen(false);
+        setFoundCustomer(null);
+        resetReturnForm();
+        setTransactionType("SALE");
+        showToast(
+          reason || "Return saved offline! Will sync automatically when connection recovers.",
+          "info",
+        );
+        if (isOnline) {
+          syncNow();
+        }
+      };
+
+      if (isLowNetwork) {
+        await saveReturnOffline();
+        return;
+      }
+
+      await api.post("/drivers/returns", returnPayload, { timeout: 10000 });
 
       setBatchModalVisible(false);
       setPendingCreateSaleOpen(false);
       setFoundCustomer(null);
       resetReturnForm();
       setTransactionType("SALE");
-      await fetchDeliveries();
+      await fetchDeliveries(true);
 
       Alert.alert("Success", "Return recorded successfully");
     } catch (err: any) {
-      console.error(
-        "handleSubmitReturn error:",
-        err?.response?.data || err.message,
-      );
-      Alert.alert(
-        "Error",
-        err?.response?.data?.message || "Failed to record return",
-      );
+      console.warn("handleSubmitReturn error:", err?.response?.data || err.message);
+
+      const isNetworkIssue =
+        !err.response ||
+        err.code === "ECONNABORTED" ||
+        err.message?.includes("timeout") ||
+        err.message?.includes("Network Error");
+
+      if (isNetworkIssue) {
+        const activeDriverId = await resolveDriverId();
+        if (activeDriverId) {
+          await offlineQueue.enqueue({
+            type: "CREATE_RETURN",
+            endpoint: "/drivers/returns",
+            method: "POST",
+            payload: {
+              driver_id: activeDriverId,
+              customer_name: foundCustomer.name,
+              phone: foundCustomer.phone,
+              address: foundCustomer.address,
+              category: returnCategory,
+              product_id: selectedReturnProduct.id,
+              quantity: returnQty,
+              return_reason: returnCategory === "DOMESTIC" ? returnReason : null,
+              payment_method: returnCategory === "COMMERCIAL" ? returnPaymentMethod : null,
+              amount: returnCategory === "COMMERCIAL" ? Number(returnAmount || 0) : 0,
+              otp: returnOtp,
+            },
+            metadata: {
+              title: `Customer Return: ${foundCustomer.name}`,
+              subtitle: `${returnCategory} • Qty: ${returnQty}`,
+              customerName: foundCustomer.name,
+              quantity: returnQty,
+              createdAt: new Date().toISOString(),
+              driverId: activeDriverId,
+            },
+          });
+          setBatchModalVisible(false);
+          setPendingCreateSaleOpen(false);
+          setFoundCustomer(null);
+          resetReturnForm();
+          setTransactionType("SALE");
+          showToast("Poor network — return saved locally and will sync in background.", "info");
+        }
+      } else {
+        Alert.alert(
+          "Error",
+          err?.response?.data?.message || "Failed to record return",
+        );
+      }
     } finally {
       setReturnSubmitting(false);
     }
@@ -622,52 +920,184 @@ export default function DeliveriesScreen() {
       const unitPrice = Number(selectedBatch.productPrice || 0);
       const totalAmount = unitPrice * orderedQty;
 
-      await api.post(
-        "/drivers/sales",
-        {
-          driver_id: activeDriverId,
-          customer_id: foundCustomer.id,
-          customer_name: foundCustomer.name,
-          phone: foundCustomer.phone,
-          address: foundCustomer.address,
+      const salePayload = {
+        driver_id: activeDriverId,
+        customer_id: foundCustomer.id && Number(foundCustomer.id) > 0 ? Number(foundCustomer.id) : undefined,
+        customer_name: foundCustomer.name,
+        phone: foundCustomer.phone,
+        address: foundCustomer.address,
 
-          cylinder_type: selectedBatch.productType,
-          product_id: selectedBatch.productId,
-          quantity: orderedQty,
+        cylinder_type: selectedBatch.productType,
+        product_id: selectedBatch.productId,
+        quantity: orderedQty,
 
-          payment_method: salePaymentMethod,
-          amount: totalAmount,
+        payment_method: salePaymentMethod,
+        amount: totalAmount,
 
-          empty_cylinder_collected: emptyCylinderQty > 0,
-          delivered_qty: orderedQty,
-          empty_cylinder_qty: Number(emptyCylinderQty || 0),
-          empty_cylinder_status: emptyCylinderStatus,
-          defective_qty: 0,
+        empty_cylinder_collected: emptyCylinderQty > 0,
+        delivered_qty: orderedQty,
+        empty_cylinder_qty: Number(emptyCylinderQty || 0),
+        empty_cylinder_status: emptyCylinderStatus,
+        defective_qty: 0,
 
-          allocation_sale_id: selectedBatch.allocationSaleId,
-          allocation_sales_item_id: selectedBatch.allocationSalesItemId,
-          batch_no: selectedBatch.batchNo,
+        allocation_sale_id: selectedBatch.allocationSaleId,
+        allocation_sales_item_id: selectedBatch.allocationSalesItemId,
+        batch_no: selectedBatch.batchNo,
 
-          otp,
-        },
-        { timeout: 30000 },
-      );
+        otp,
+      };
+
+      const isLowNetwork = !isOnline || isSlowNetwork;
+
+      const saveSaleOfflineAndProceed = async (reason?: string) => {
+        const tempSaleId = -Date.now();
+        await offlineQueue.enqueue({
+          type: "CREATE_SALE",
+          endpoint: "/drivers/sales",
+          method: "POST",
+          payload: salePayload,
+          metadata: {
+            title: `Spot Sale: ${foundCustomer.name}`,
+            subtitle: `${selectedBatch.productType} • ${salePaymentMethod} ₹${totalAmount}`,
+            customerName: foundCustomer.name,
+            saleId: tempSaleId,
+            amount: totalAmount,
+            quantity: orderedQty,
+            emptyCylinderQty: Number(emptyCylinderQty || 0),
+            createdAt: new Date().toISOString(),
+            driverId: activeDriverId,
+          },
+        });
+
+        // Cache customer record
+        await deliveryCache.cacheCustomer(foundCustomer);
+
+        // Optimistically update dashboard
+        setDashboard((prev) => {
+          if (!prev) return prev;
+          const pendingAction = {
+            id: `temp_${Date.now()}`,
+            type: "CREATE_SALE" as const,
+            endpoint: "/drivers/sales",
+            method: "POST" as const,
+            payload: salePayload,
+            metadata: {
+              title: `Spot Sale: ${foundCustomer.name}`,
+              subtitle: `${selectedBatch.productType} • ${salePaymentMethod} ₹${totalAmount}`,
+              customerName: foundCustomer.name,
+              saleId: tempSaleId,
+              amount: totalAmount,
+              quantity: orderedQty,
+              emptyCylinderQty: Number(emptyCylinderQty || 0),
+              createdAt: new Date().toISOString(),
+              driverId: activeDriverId,
+            },
+            status: "PENDING" as const,
+            retryCount: 0,
+            maxRetries: 5,
+            createdAt: new Date().toISOString(),
+          };
+          return deliveryCache.mergePendingActions(prev, [pendingAction]);
+        });
+
+        setCreateSaleVisible(false);
+        setFoundCustomer(null);
+        resetCreateSaleForm();
+        showToast(
+          reason || "Spot sale saved offline! Will sync automatically when connection recovers.",
+          "info",
+        );
+        if (isOnline) {
+          syncNow();
+        }
+      };
+
+      if (isLowNetwork) {
+        await saveSaleOfflineAndProceed();
+        return;
+      }
+
+      await api.post("/drivers/sales", salePayload, { timeout: 10000 });
+
+      // Cache customer on success
+      await deliveryCache.cacheCustomer(foundCustomer);
 
       setCreateSaleVisible(false);
       setFoundCustomer(null);
       resetCreateSaleForm();
-      await fetchDeliveries();
+      await fetchDeliveries(true);
 
       Alert.alert("Success", "Sale created successfully");
     } catch (err: any) {
-      console.error(
+      console.warn(
         "handleCreateSaleFromCustomer error:",
         err?.response?.data || err.message,
       );
-      Alert.alert(
-        "Error",
-        err?.response?.data?.message || "Failed to create sale",
-      );
+
+      const isNetworkIssue =
+        !err.response ||
+        err.code === "ECONNABORTED" ||
+        err.message?.includes("timeout") ||
+        err.message?.includes("Network Error");
+
+      if (isNetworkIssue) {
+        const activeDriverId = await resolveDriverId();
+        if (activeDriverId && foundCustomer && selectedBatch) {
+          const orderedQty =
+            selectedBatch.productType === "COMMERCIAL" ? saleQty : 1;
+          const unitPrice = Number(selectedBatch.productPrice || 0);
+          const totalAmount = unitPrice * orderedQty;
+          const tempSaleId = -Date.now();
+
+          await offlineQueue.enqueue({
+            type: "CREATE_SALE",
+            endpoint: "/drivers/sales",
+            method: "POST",
+            payload: {
+              driver_id: activeDriverId,
+              customer_id: foundCustomer.id && Number(foundCustomer.id) > 0 ? Number(foundCustomer.id) : undefined,
+              customer_name: foundCustomer.name,
+              phone: foundCustomer.phone,
+              address: foundCustomer.address,
+              cylinder_type: selectedBatch.productType,
+              product_id: selectedBatch.productId,
+              quantity: orderedQty,
+              payment_method: salePaymentMethod,
+              amount: totalAmount,
+              empty_cylinder_collected: emptyCylinderQty > 0,
+              delivered_qty: orderedQty,
+              empty_cylinder_qty: Number(emptyCylinderQty || 0),
+              empty_cylinder_status: emptyCylinderQty > 0 ? "DELIVERED" : "PENDING",
+              defective_qty: 0,
+              allocation_sale_id: selectedBatch.allocationSaleId,
+              allocation_sales_item_id: selectedBatch.allocationSalesItemId,
+              batch_no: selectedBatch.batchNo,
+              otp,
+            },
+            metadata: {
+              title: `Spot Sale: ${foundCustomer.name}`,
+              subtitle: `${selectedBatch.productType} • ${salePaymentMethod} ₹${totalAmount}`,
+              customerName: foundCustomer.name,
+              saleId: tempSaleId,
+              amount: totalAmount,
+              quantity: orderedQty,
+              emptyCylinderQty: Number(emptyCylinderQty || 0),
+              createdAt: new Date().toISOString(),
+              driverId: activeDriverId,
+            },
+          });
+
+          setCreateSaleVisible(false);
+          setFoundCustomer(null);
+          resetCreateSaleForm();
+          showToast("Poor network — sale saved locally and will sync in background.", "info");
+        }
+      } else {
+        Alert.alert(
+          "Error",
+          err?.response?.data?.message || "Failed to create sale",
+        );
+      }
     } finally {
       setCreateSaleLoading(false);
     }
@@ -956,6 +1386,7 @@ export default function DeliveriesScreen() {
                       status={item.status}
                       showMarkDelivered={item.showMarkDelivered}
                       onMarkDelivered={() => handleOpenConfirm(item)}
+                      isOfflinePending={Boolean((item as any).isOfflineQueued)}
                     />
                   </TouchableOpacity>
                 ))

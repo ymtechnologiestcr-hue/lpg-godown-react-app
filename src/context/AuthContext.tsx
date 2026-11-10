@@ -9,6 +9,10 @@ import {
   isSupportedMobileRole,
 } from '../constants/auth';
 import { fetchUserSettings } from '../services/authService';
+import {
+  markAuthSessionActive,
+  subscribeToSessionExpired,
+} from '../services/authSession';
 
 interface AuthContextType {
   token: string | null;
@@ -106,7 +110,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    const unsubscribe = subscribeToSessionExpired(() => {
+      setToken(null);
+      setUser(null);
+      setRole(null);
+      setAgencyName(null);
+      setIsAuthenticated(false);
+    });
     checkAuth();
+    return unsubscribe;
   }, []);
 
   const login = async (newToken: string, newUser: AuthUser) => {
@@ -121,6 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     await AsyncStorage.multiSet(items);
+    markAuthSessionActive();
 
     setToken(newToken);
     setUser(newUser);

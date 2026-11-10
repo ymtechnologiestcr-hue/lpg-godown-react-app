@@ -16,6 +16,7 @@ export type DriverStats = {
 
 export type DriverDeliveryItem = {
   saleId: number;
+  customerId?: number | null;
   customerName: string;
   consumerNumber?: string | null;
   address: string;

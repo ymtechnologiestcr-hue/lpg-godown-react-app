@@ -17,9 +17,11 @@ import {
 
 import AppHeader from "../components/common/AppHeader";
 import ScreenContainer from "../components/common/ScreenContainer";
+import { showToast } from "../components/common/ToastManager";
 import { AUTH_USER_KEY } from "../constants/auth";
 import { DS, EYEBROW, PALETTE, RADIUS, TYPO } from "../constants/designSystem";
 import api from "../services/api";
+import { offlineQueue } from "../services/offline/offlineQueue";
 
 type Customer = {
   id: number;
@@ -386,6 +388,47 @@ export default function AddDeliveryScreen() {
         Alert.alert("Error", response.data?.message || "Booking failed");
       }
     } catch (err: any) {
+      const isNetworkIssue =
+        !err.response ||
+        err.code === "ECONNABORTED" ||
+        err.message?.includes("timeout") ||
+        err.message?.includes("Network Error");
+
+      if (isNetworkIssue && selectedCustomer) {
+        await offlineQueue.enqueue({
+          type: "GENERIC_MUTATION",
+          endpoint: "/drivers/bookings",
+          method: "POST",
+          payload: {
+            driver_id: driverId,
+            customer_id: selectedCustomer.id,
+            address_id: selectedCustomer.addressId,
+            items: selectedItems.map((item) => ({
+              product_id: item.id,
+              quantity: item.qty,
+            })),
+          },
+          metadata: {
+            title: `Booking: ${selectedCustomer.name}`,
+            subtitle: `${selectedItems.length} product(s)`,
+            customerName: selectedCustomer.name,
+            createdAt: new Date().toISOString(),
+            driverId: driverId || undefined,
+          },
+        });
+
+        showToast("Booking saved offline! Will sync when connection recovers.", "info");
+        setStep(1);
+        setPhone("");
+        setCustomerExists(false);
+        setSelectedCustomer(null);
+        setName("");
+        setAddress("");
+        setGeoLocationTag("");
+        setProducts([]);
+        return;
+      }
+
       Alert.alert(
         "Error",
         err?.response?.data?.message || "Failed to create booking",

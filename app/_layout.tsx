@@ -2,11 +2,14 @@ import { Redirect, Stack, useSegments } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import NetworkBanner from "../src/components/common/NetworkBanner";
 import ToastManager from "../src/components/common/ToastManager";
+import OfflineSyncModal from "../src/components/ui/OfflineSyncModal";
 import { APP_ROLES } from "../src/constants/appRole";
 import { getHomeRouteByRole } from "../src/constants/auth";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { DateRangeProvider } from "../src/context/DateRangeContext";
+import { NetworkProvider } from "../src/context/NetworkContext";
 
 function RootNavigation() {
   const segments = useSegments();
@@ -61,8 +64,10 @@ function RootNavigation() {
 
   return (
     <>
+      <NetworkBanner />
       <Stack screenOptions={{ headerShown: false }} />
       <ToastManager />
+      <OfflineSyncModal />
     </>
   );
 }
@@ -72,7 +77,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <DateRangeProvider>
-          <RootNavigation />
+          <NetworkProvider>
+            <RootNavigation />
+          </NetworkProvider>
         </DateRangeProvider>
       </AuthProvider>
     </SafeAreaProvider>

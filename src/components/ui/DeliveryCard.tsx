@@ -18,6 +18,7 @@ type Props = {
   showMarkDelivered?: boolean;
   onMarkDelivered?: () => void;
   loading?: boolean;
+  isOfflinePending?: boolean;
 };
 
 export default function DeliveryCard({
@@ -30,6 +31,7 @@ export default function DeliveryCard({
   showMarkDelivered = false,
   onMarkDelivered,
   loading = false,
+  isOfflinePending = false,
 }: Props) {
   const isDelivered = status === 'Delivered';
   const isCancelled = status === 'Cancelled';
@@ -56,29 +58,38 @@ export default function DeliveryCard({
           </Text>
         </View>
 
-        <View
-          style={[
-            styles.badge,
-            isDelivered
-              ? styles.deliveredBadge
-              : isCancelled
-              ? styles.cancelledBadge
-              : styles.pendingBadge,
-          ]}
-        >
-          <Text
+        {isOfflinePending ? (
+          <View style={[styles.badge, styles.offlineBadge]}>
+            <Ionicons name="cloud-upload-outline" size={12} color={PALETTE.yellow700} style={{ marginRight: 4 }} />
+            <Text style={[styles.badgeText, styles.offlineText]}>
+              Pending Sync
+            </Text>
+          </View>
+        ) : (
+          <View
             style={[
-              styles.badgeText,
+              styles.badge,
               isDelivered
-                ? styles.deliveredText
+                ? styles.deliveredBadge
                 : isCancelled
-                ? styles.cancelledText
-                : styles.pendingText,
+                ? styles.cancelledBadge
+                : styles.pendingBadge,
             ]}
           >
-            {status}
-          </Text>
-        </View>
+            <Text
+              style={[
+                styles.badgeText,
+                isDelivered
+                  ? styles.deliveredText
+                  : isCancelled
+                  ? styles.cancelledText
+                  : styles.pendingText,
+              ]}
+            >
+              {status}
+            </Text>
+          </View>
+        )}
       </View>
 
       {showMarkDelivered && (
@@ -155,6 +166,13 @@ const styles = StyleSheet.create({
   deliveredBadge: {
     backgroundColor: DS.greenSoft,
   },
+  offlineBadge: {
+    backgroundColor: PALETTE.yellow50,
+    borderWidth: 1,
+    borderColor: PALETTE.yellow100,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   pendingBadge: {
     backgroundColor: DS.orangeSoft,
   },
@@ -166,6 +184,10 @@ const styles = StyleSheet.create({
   },
   deliveredText: {
     color: PALETTE.green600,
+  },
+  offlineText: {
+    color: PALETTE.yellow700,
+    fontWeight: '600',
   },
   pendingText: {
     color: DS.orangeText,

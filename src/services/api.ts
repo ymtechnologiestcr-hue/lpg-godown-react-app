@@ -3,6 +3,11 @@ import { create } from "axios";
 import { showToast } from "../components/common/ToastManager";
 import { AUTH_TOKEN_KEY } from "../constants/auth";
 import { DATE_RANGE_STORAGE_KEY } from "../context/DateRangeContext";
+import { networkMonitor } from "./network/networkMonitor";
+import {
+  expireAuthSession,
+  isAuthSessionExpired,
+} from "./authSession";
 
 // Production builds set EXPO_PUBLIC_API_BASE_URL (must include the /api suffix,
 // e.g. https://<your-app>.up.railway.app/api). Falls back to the local machine
@@ -15,6 +20,16 @@ export const API_BASE_URL = (
 ).replace(/\/+$/, "");
 export const API_SERVER_ROOT = API_BASE_URL.replace(/\/api\/?$/, "");
 
+const isTokenExpiryMessage = (data: any) => {
+  const responseText = [data?.message, data?.error, data?.code]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return /(?:token|jwt).{0,40}(?:expired|invalid)|(?:expired|invalid).{0,40}(?:token|jwt)|session.{0,30}expired/.test(
+    responseText,
+  );
+};
+
 const api = create({
   baseURL: API_BASE_URL,
   timeout: 10000,
@@ -22,6 +37,10 @@ const api = create({
 
 api.interceptors.request.use(async (config) => {
   const url = String(config.url || "");
+  if (isAuthSessionExpired() && !url.includes("/auth/")) {
+    throw new Error("Auth session expired. Request cancelled.");
+  }
+
   let token: string | null = null;
 
   try {
@@ -81,11 +100,26 @@ api.interceptors.request.use(async (config) => {
     // keep request unchanged if storage read fails
   }
 
+  (config as any)._requestStartTime = Date.now();
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => {
+  async (response) => {
+    const url = String(response.config?.url || "");
+    if (!url.includes("/auth/") && isTokenExpiryMessage(response.data)) {
+      await expireAuthSession();
+      return Promise.reject(
+        new Error(response.data?.message || "Auth session expired."),
+      );
+    }
+
+    const startTime = (response.config as any)?._requestStartTime;
+    if (startTime) {
+      const duration = Date.now() - startTime;
+      networkMonitor.reportRequestSuccess(duration);
+    }
+
     // If the response explicitly contains a success message, show it
     if (response.data && response.data.success && response.data.message) {
       // Don't show toast for GET requests unless explicitly desired, but standardizing
@@ -97,7 +131,41 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
+  async (error) => {
+    // Report failure/timeout to network monitor
+    networkMonitor.reportRequestFailure(error);
+
+    if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
+      return Promise.reject(error);
+    }
+
+    const isRequestTimeout =
+      !error.response &&
+      (error?.code === "ECONNABORTED" ||
+        error?.code === "ETIMEDOUT" ||
+        /timed? ?out|timeout/i.test(String(error?.message || "")));
+    if (isRequestTimeout) {
+      return Promise.reject(error);
+    }
+
+    const url = String(error.config?.url || "");
+    const isAuthRequest = url.includes("/auth/");
+    const isTokenExpired = isTokenExpiryMessage(error.response?.data);
+    const isMissingToken = error?.message === "No auth token available. Request cancelled.";
+    const isProtectedApiFailure =
+      Boolean(error.config && !isAuthRequest) || isMissingToken;
+
+    if (
+      isProtectedApiFailure &&
+      (error.response?.status === 401 ||
+        isTokenExpired ||
+        Boolean(error.response) ||
+        isMissingToken)
+    ) {
+      await expireAuthSession();
+      return Promise.reject(error);
+    }
+
     // Don't show global error toast for 401 (Unauthorized) errors, 
     // especially during logout to avoid annoying popups when token is cleared.
     // 401s are usually handled by redirecting to login, or local catch blocks.
