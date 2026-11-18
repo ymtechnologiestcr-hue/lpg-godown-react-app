@@ -3,6 +3,7 @@ import { create } from "axios";
 import { showToast } from "../components/common/ToastManager";
 import { AUTH_TOKEN_KEY } from "../constants/auth";
 import { DATE_RANGE_STORAGE_KEY } from "../context/DateRangeContext";
+import { globalLoader } from "./loader/globalLoaderService";
 import { networkMonitor } from "./network/networkMonitor";
 import {
   expireAuthSession,
@@ -41,10 +42,29 @@ api.interceptors.request.use(async (config) => {
     throw new Error("Auth session expired. Request cancelled.");
   }
 
+  // Start global loader unless explicitly bypassed
+  const skipLoader = (config as any)?.skipGlobalLoader;
+  if (!skipLoader) {
+    (config as any)._stopLoader = globalLoader.startRequest({
+      message: (config as any)?.loaderMessage,
+      blocking: (config as any)?.blockingLoader,
+    });
+  }
+
   let token: string | null = null;
 
   try {
     token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+    // On cold app launches, AsyncStorage might take a few moments to resolve.
+    // Retry up to 2 times (total ~300ms) before giving up and canceling.
+    if (!token && !isAuthSessionExpired() && !url.includes("/auth/")) {
+      await new Promise((r) => setTimeout(r, 120));
+      token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      if (!token) {
+        await new Promise((r) => setTimeout(r, 180));
+        token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      }
+    }
   } catch (error) {
     console.error("Error retrieving token:", error);
   }
@@ -106,6 +126,11 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   async (response) => {
+    // Stop global loader for this request
+    if (typeof (response.config as any)?._stopLoader === "function") {
+      (response.config as any)._stopLoader();
+    }
+
     const url = String(response.config?.url || "");
     if (!url.includes("/auth/") && isTokenExpiryMessage(response.data)) {
       await expireAuthSession();
@@ -132,6 +157,11 @@ api.interceptors.response.use(
     return response;
   },
   async (error) => {
+    // Stop global loader for this request
+    if (typeof (error.config as any)?._stopLoader === "function") {
+      (error.config as any)._stopLoader();
+    }
+
     // Report failure/timeout to network monitor
     networkMonitor.reportRequestFailure(error);
 
@@ -155,12 +185,10 @@ api.interceptors.response.use(
     const isProtectedApiFailure =
       Boolean(error.config && !isAuthRequest) || isMissingToken;
 
+    // Only expire auth session when explicitly 401 Unauthorized or confirmed token expiry
     if (
       isProtectedApiFailure &&
-      (error.response?.status === 401 ||
-        isTokenExpired ||
-        Boolean(error.response) ||
-        isMissingToken)
+      (error.response?.status === 401 || isTokenExpired)
     ) {
       await expireAuthSession();
       return Promise.reject(error);

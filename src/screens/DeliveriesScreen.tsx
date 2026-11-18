@@ -110,6 +110,8 @@ export default function DeliveriesScreen() {
   const { isOnline, isSlowNetwork, syncNow } = useNetwork();
   const [driverId, setDriverId] = useState<number | null>(null);
   const driverIdRef = useRef<number | null>(driverId);
+  const [agencyId, setAgencyId] = useState<number | null>(null);
+  const agencyIdRef = useRef<number | null>(agencyId);
 
   const [dashboard, setDashboard] = useState<DriverDeliveriesResponse | null>(
     null,
@@ -188,11 +190,33 @@ export default function DeliveriesScreen() {
       if (parsed?.role && parsed.role !== APP_ROLES.DRIVER) {
         return null;
       }
+      const aid = Number(parsed?.agency_id || parsed?.agencyId);
+      if (aid && !Number.isNaN(aid)) {
+        agencyIdRef.current = aid;
+        setAgencyId(aid);
+      }
       const id = Number(parsed?.driver_id || parsed?.id || parsed?.user_id);
       if (id && !Number.isNaN(id)) {
         driverIdRef.current = id;
         setDriverId(id);
         return id;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const resolveDriverAgencyId = useCallback(async (): Promise<number | null> => {
+    if (agencyIdRef.current) return agencyIdRef.current;
+    try {
+      const raw = await AsyncStorage.getItem(AUTH_USER_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      const aid = Number(parsed?.agency_id || parsed?.agencyId);
+      if (aid && !Number.isNaN(aid)) {
+        agencyIdRef.current = aid;
+        setAgencyId(aid);
+        return aid;
       }
       return null;
     } catch {
@@ -215,7 +239,13 @@ export default function DeliveriesScreen() {
           return;
         }
 
-        const activeDriverId = await resolveDriverId();
+        let activeDriverId = await resolveDriverId();
+
+        if (!activeDriverId) {
+          // Cold launch retry: wait 200ms in case AsyncStorage is resolving
+          await new Promise((r) => setTimeout(r, 200));
+          activeDriverId = await resolveDriverId();
+        }
 
         if (!activeDriverId) {
           setError("Driver session not found");
@@ -249,12 +279,27 @@ export default function DeliveriesScreen() {
         }
         const queryStr = params.toString() ? `?${params.toString()}` : "";
 
-        const response = await api.get(
-          `/drivers/${activeDriverId}/app-deliveries${queryStr}`,
-          // Allow for a cold backend / slow connection; the cache is already
-          // rendered while this request completes.
-          { timeout: 30000 },
-        );
+        let response;
+        try {
+          response = await api.get(
+            `/drivers/${activeDriverId}/app-deliveries${queryStr}`,
+            // Allow for a cold backend / slow connection; the cache is already
+            // rendered while this request completes.
+            { timeout: 30000 },
+          );
+        } catch (initialErr: any) {
+          // If no local cache exists and initial call experiences a transient hiccup
+          // (e.g. backend spinup/network handshake), retry once automatically before erroring out.
+          if (!cached && !dashboardRef.current) {
+            await new Promise((r) => setTimeout(r, 450));
+            response = await api.get(
+              `/drivers/${activeDriverId}/app-deliveries${queryStr}`,
+              { timeout: 30000 },
+            );
+          } else {
+            throw initialErr;
+          }
+        }
 
         if (response.data?.success) {
           await deliveryCache.saveDeliveries(activeDriverId, response.data.data);
@@ -385,7 +430,8 @@ export default function DeliveriesScreen() {
 
       setConfirmVisible(false);
       setSelectedSale(null);
-      await fetchDeliveries(true);
+      setConfirmLoading(false);
+      fetchDeliveries(true).catch((e) => console.warn("Background fetchDeliveries error:", e));
     } catch (err: any) {
       console.warn("Confirm delivery API error:", err?.response?.data || err.message);
 
@@ -512,6 +558,7 @@ export default function DeliveriesScreen() {
         address?: string;
         productType?: string;
         quantity?: number;
+        agencyId?: number;
       }) => {
         const validId = customer.id && Number(customer.id) > 0 ? Number(customer.id) : null;
         setFoundCustomer({
@@ -523,15 +570,21 @@ export default function DeliveriesScreen() {
           quantity: Number(customer.quantity || 1),
         });
 
-        // Cache customer record
-        await deliveryCache.cacheCustomer({
-          id: validId as any,
-          name: customer.name || "",
-          phone: customer.phone || "",
-          address: customer.address || "",
-          productType: customer.productType || "Domestic",
-          quantity: Number(customer.quantity || 1),
-        });
+        const activeAgencyId = await resolveDriverAgencyId();
+
+        // Cache customer record scoped by agency
+        await deliveryCache.cacheCustomer(
+          {
+            id: validId as any,
+            name: customer.name || "",
+            phone: customer.phone || "",
+            address: customer.address || "",
+            productType: customer.productType || "Domestic",
+            quantity: Number(customer.quantity || 1),
+            agencyId: activeAgencyId || undefined,
+          },
+          activeAgencyId || undefined,
+        );
 
         handleCloseFinder();
         resetCreateSaleForm();
@@ -550,9 +603,13 @@ export default function DeliveriesScreen() {
         setBatchModalVisible(true);
       };
 
+      const activeAgencyId = await resolveDriverAgencyId();
+
       // 1. If completely offline, search offline cache and assigned deliveries
       if (!isOnline) {
-        const cachedCustomer = await deliveryCache.findCachedCustomer(searchValue);
+        const cachedCustomer = activeAgencyId
+          ? await deliveryCache.findCachedCustomer(searchValue, activeAgencyId)
+          : null;
         if (cachedCustomer) {
           await setupCustomerFound(cachedCustomer);
           showToast("Customer found from offline records", "info");
@@ -573,6 +630,7 @@ export default function DeliveriesScreen() {
             address: match.address,
             productType: match.cylinderType || "Domestic",
             quantity: match.quantity || 1,
+            agencyId: activeAgencyId || undefined,
           });
           showToast("Customer matched from assigned deliveries", "info");
           return;
@@ -585,7 +643,7 @@ export default function DeliveriesScreen() {
         return;
       }
 
-      // 2. Online search with fallback
+      // 2. Online search
       const response = await api.get(
         `/drivers/customers/find?query=${encodeURIComponent(searchValue)}`,
         { timeout: 7000 },
@@ -600,19 +658,34 @@ export default function DeliveriesScreen() {
           address: customer.address || "",
           productType: customer.productType || customer.type || "Domestic",
           quantity: Number(customer.quantity || 1),
+          agencyId: activeAgencyId || undefined,
         });
       } else {
-        const cachedCustomer = await deliveryCache.findCachedCustomer(searchValue);
-        if (cachedCustomer) {
-          await setupCustomerFound(cachedCustomer);
-          showToast("Customer found from offline records", "info");
-        } else {
-          Alert.alert("Not found", response.data?.message || "Customer not found");
-        }
+        Alert.alert("Not found", response.data?.message || "Customer not found");
       }
     } catch (err: any) {
       console.warn("handleFindCustomer error:", err?.response?.data || err.message);
-      const cachedCustomer = await deliveryCache.findCachedCustomer(searchValue);
+
+      // If server explicitly responded with 404 (Not Found), customer does not exist in this agency!
+      if (err?.response?.status === 404 || err?.response?.data?.message === "Customer not found") {
+        Alert.alert("Not found", err?.response?.data?.message || "Customer not found");
+        return;
+      }
+
+      if (err?.response?.status === 403) {
+        Alert.alert(
+          "Access Denied",
+          err?.response?.data?.message || "Driver agency could not be determined. Please log in again.",
+        );
+        return;
+      }
+
+      // Only check offline cache if this was a network connectivity failure
+      const activeAgencyId = await resolveDriverAgencyId();
+      const cachedCustomer = activeAgencyId
+        ? await deliveryCache.findCachedCustomer(searchValue, activeAgencyId)
+        : null;
+
       if (cachedCustomer) {
         setFoundCustomer({
           id: Number(cachedCustomer.id),
@@ -629,7 +702,7 @@ export default function DeliveriesScreen() {
         setBatchModalVisible(true);
         showToast("Loaded customer from offline cache", "info");
       } else {
-        Alert.alert("Error", "Could not reach server and no offline record was found");
+        Alert.alert("Error", err?.response?.data?.message || "Could not reach server and no offline record was found");
       }
     } finally {
       setFindingCustomer(false);
@@ -720,6 +793,7 @@ export default function DeliveriesScreen() {
       setReturnSubmitting(true);
 
       const activeDriverId = await resolveDriverId();
+      const activeAgencyId = await resolveDriverAgencyId();
       if (!activeDriverId) {
         Alert.alert("Error", "Driver session not found");
         return;
@@ -887,6 +961,7 @@ export default function DeliveriesScreen() {
       setCreateSaleLoading(true);
 
       const activeDriverId = await resolveDriverId();
+      const activeAgencyId = await resolveDriverAgencyId();
       if (!activeDriverId) {
         Alert.alert("Error", "Driver session not found");
         setCreateSaleLoading(false);
@@ -919,8 +994,10 @@ export default function DeliveriesScreen() {
 
       const unitPrice = Number(selectedBatch.productPrice || 0);
       const totalAmount = unitPrice * orderedQty;
+      const clientTxId = `ctx_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
 
       const salePayload = {
+        client_tx_id: clientTxId,
         driver_id: activeDriverId,
         customer_id: foundCustomer.id && Number(foundCustomer.id) > 0 ? Number(foundCustomer.id) : undefined,
         customer_name: foundCustomer.name,
@@ -969,8 +1046,15 @@ export default function DeliveriesScreen() {
           },
         });
 
+        // Optimistically update local cached batch
+        await deliveryCache.decrementBatchPending(
+          activeDriverId,
+          selectedBatch.allocationSalesItemId,
+          orderedQty,
+        );
+
         // Cache customer record
-        await deliveryCache.cacheCustomer(foundCustomer);
+        await deliveryCache.cacheCustomer(foundCustomer, activeAgencyId || undefined);
 
         // Optimistically update dashboard
         setDashboard((prev) => {
@@ -1019,15 +1103,22 @@ export default function DeliveriesScreen() {
 
       await api.post("/drivers/sales", salePayload, { timeout: 10000 });
 
+      // Optimistically decrement local cached batch so immediate next sale has fresh count
+      await deliveryCache.decrementBatchPending(
+        activeDriverId,
+        selectedBatch.allocationSalesItemId,
+        orderedQty,
+      );
+
       // Cache customer on success
-      await deliveryCache.cacheCustomer(foundCustomer);
+      await deliveryCache.cacheCustomer(foundCustomer, activeAgencyId || undefined);
 
       setCreateSaleVisible(false);
       setFoundCustomer(null);
       resetCreateSaleForm();
-      await fetchDeliveries(true);
-
+      setCreateSaleLoading(false);
       Alert.alert("Success", "Sale created successfully");
+      fetchDeliveries(true).catch((e) => console.warn("Background fetchDeliveries error:", e));
     } catch (err: any) {
       console.warn(
         "handleCreateSaleFromCustomer error:",
@@ -2266,6 +2357,7 @@ function ConfirmNewSaleModal({
   const emptyMismatch = isDomesticBatch && emptyCylinderQty !== orderedQty;
 
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const confirmSaleScrollRef = useRef<ScrollView>(null);
   const { height: windowHeight } = useWindowDimensions();
 
   useEffect(() => {
@@ -2300,6 +2392,7 @@ function ConfirmNewSaleModal({
           ]}
         >
             <ScrollView
+              ref={confirmSaleScrollRef}
               style={styles.confirmSaleScroll}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -2471,6 +2564,17 @@ function ConfirmNewSaleModal({
                 maxLength={6}
                 value={otp}
                 onChangeText={onOtpChange}
+                onFocus={() => {
+                  // Give the keyboard time to resize the modal before scrolling
+                  // the focused field above it (especially on Android).
+                  setTimeout(
+                    () =>
+                      confirmSaleScrollRef.current?.scrollToEnd({
+                        animated: true,
+                      }),
+                    250,
+                  );
+                }}
               />
 
               <View style={styles.actionRow}>
@@ -3161,13 +3265,15 @@ const styles = StyleSheet.create({
   otpInput: {
     ...TYPO.h5,
     alignSelf: "center",
-    width: 220,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: DS.border,
+    width: 240,
+    minHeight: 56,
+    paddingVertical: 10,
+    borderWidth: 2,
+    borderColor: DS.primary,
     borderRadius: RADIUS.md,
+    backgroundColor: DS.white,
     textAlign: "center",
-    letterSpacing: 18,
+    letterSpacing: 14,
     color: DS.textPrimary,
     marginBottom: 26,
   },

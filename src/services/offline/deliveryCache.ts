@@ -4,7 +4,8 @@ import { OfflineAction } from "./offlineQueue";
 
 const CACHE_KEY_PREFIX = "@lpg_driver_deliveries_cache_";
 const BATCHES_CACHE_KEY_PREFIX = "@lpg_driver_batches_cache_";
-const CUSTOMERS_CACHE_KEY = "@lpg_cached_customers_v1";
+const CUSTOMERS_CACHE_KEY_PREFIX = "@lpg_cached_customers_agency_";
+const LEGACY_CUSTOMERS_CACHE_KEY = "@lpg_cached_customers_v1";
 
 export type CachedDeliveryItem = DriverDeliveryItem & {
   isOfflineQueued?: boolean;
@@ -24,6 +25,7 @@ export interface CachedCustomer {
   consumerNumber?: string;
   productType?: string;
   quantity?: number;
+  agencyId?: number;
   lastUsedAt: number;
 }
 
@@ -219,44 +221,85 @@ class DeliveryCacheManager {
   }
 
   /**
-   * Cache customer profiles so driver can search even while offline
+   * Optimistically decrement pending cylinders from the local batch cache
+   * so the next sale performed immediately has the accurate count.
    */
-  public async cacheCustomer(customer: {
-    id: number;
-    name: string;
-    phone: string;
-    address?: string;
-    consumerNumber?: string;
-    productType?: string;
-    quantity?: number;
-  }): Promise<void> {
+  public async decrementBatchPending(
+    driverId: number,
+    allocationSalesItemId: number,
+    quantity: number,
+  ): Promise<void> {
     try {
-      const existing = await this.getCachedCustomers();
+      const batches = await this.getCachedBatches(driverId);
+      if (!batches || !batches.length) return;
+      const updated = batches
+        .map((b) => {
+          if (b.allocationSalesItemId === allocationSalesItemId) {
+            const newPending = Math.max(0, (b.pending || 0) - quantity);
+            const newDelivered = (b.delivered || 0) + quantity;
+            return { ...b, pending: newPending, delivered: newDelivered };
+          }
+          return b;
+        })
+        .filter((b) => b.pending > 0);
+      await this.saveBatches(driverId, updated);
+    } catch (e) {
+      console.warn("decrementBatchPending error:", e);
+    }
+  }
+
+  /**
+   * Cache customer profiles so driver can search even while offline.
+   * Scoped strictly per agency to prevent cross-agency customer leakage.
+   */
+  public async cacheCustomer(
+    customer: {
+      id: number;
+      name: string;
+      phone: string;
+      address?: string;
+      consumerNumber?: string;
+      productType?: string;
+      quantity?: number;
+      agencyId?: number;
+    },
+    agencyId?: number,
+  ): Promise<void> {
+    try {
+      const targetAgencyId = agencyId || customer.agencyId;
+      if (!targetAgencyId) return;
+
+      const cacheKey = `${CUSTOMERS_CACHE_KEY_PREFIX}${targetAgencyId}`;
+      const existing = await this.getCachedCustomers(targetAgencyId);
       const filtered = existing.filter((c) => c.id !== customer.id && c.phone !== customer.phone);
       const updated: CachedCustomer[] = [
-        { ...customer, lastUsedAt: Date.now() },
+        { ...customer, agencyId: targetAgencyId, lastUsedAt: Date.now() },
         ...filtered,
-      ].slice(0, 100); // keep up to 100 recent customers
+      ].slice(0, 100);
 
-      await AsyncStorage.setItem(CUSTOMERS_CACHE_KEY, JSON.stringify(updated));
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(updated));
     } catch (e) {
       console.error("Failed to cache customer:", e);
     }
   }
 
-  public async getCachedCustomers(): Promise<CachedCustomer[]> {
+  public async getCachedCustomers(agencyId?: number): Promise<CachedCustomer[]> {
     try {
-      const raw = await AsyncStorage.getItem(CUSTOMERS_CACHE_KEY);
+      // One-time silent purge of legacy un-scoped cache
+      AsyncStorage.removeItem(LEGACY_CUSTOMERS_CACHE_KEY).catch(() => {});
+
+      if (!agencyId) return [];
+      const raw = await AsyncStorage.getItem(`${CUSTOMERS_CACHE_KEY_PREFIX}${agencyId}`);
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
     }
   }
 
-  public async findCachedCustomer(query: string): Promise<CachedCustomer | null> {
+  public async findCachedCustomer(query: string, agencyId?: number): Promise<CachedCustomer | null> {
     const q = query.trim().toLowerCase();
-    if (!q) return null;
-    const customers = await this.getCachedCustomers();
+    if (!q || !agencyId) return null;
+    const customers = await this.getCachedCustomers(agencyId);
     return (
       customers.find(
         (c) =>
@@ -265,6 +308,17 @@ class DeliveryCacheManager {
           c.name?.toLowerCase().includes(q),
       ) || null
     );
+  }
+
+  public async clearCustomerCache(agencyId?: number): Promise<void> {
+    try {
+      if (agencyId) {
+        await AsyncStorage.removeItem(`${CUSTOMERS_CACHE_KEY_PREFIX}${agencyId}`);
+      }
+      await AsyncStorage.removeItem(LEGACY_CUSTOMERS_CACHE_KEY);
+    } catch (e) {
+      console.error("Failed to clear customer cache:", e);
+    }
   }
 }
 

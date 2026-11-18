@@ -13,6 +13,7 @@ import {
   markAuthSessionActive,
   subscribeToSessionExpired,
 } from '../services/authSession';
+import { deliveryCache } from '../services/offline/deliveryCache';
 
 interface AuthContextType {
   token: string | null;
@@ -143,7 +144,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY, APP_ROLE_KEY, AGENCY_NAME_KEY]);
+    try {
+      await deliveryCache.clearCustomerCache(user?.agency_id ? Number(user.agency_id) : undefined);
+    } catch {}
+    await AsyncStorage.multiRemove([
+      AUTH_TOKEN_KEY,
+      AUTH_USER_KEY,
+      APP_ROLE_KEY,
+      AGENCY_NAME_KEY,
+      "@lpg_cached_customers_v1",
+    ]);
     setToken(null);
     setUser(null);
     setRole(null);

@@ -149,9 +149,9 @@ class NetworkMonitor {
     this.isPinging = true;
     const startTime = Date.now();
 
-    // Probe the public server root; /auth/identify is an account lookup endpoint,
-    // not a health check, and can return 401 when no credentials are supplied.
-    const pingUrl = `${API_SERVER_ROOT}/`;
+    // Probe the public backend health check (/api/health);
+    // /auth/identify is an account lookup endpoint that requires auth parameters.
+    const pingUrl = `${API_SERVER_ROOT}/api/health`;
 
     try {
       const controller = new AbortController();

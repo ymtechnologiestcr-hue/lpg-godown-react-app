@@ -2,6 +2,7 @@ import { Redirect, Stack, useSegments } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import GlobalLoader from "../src/components/common/GlobalLoader";
 import NetworkBanner from "../src/components/common/NetworkBanner";
 import ToastManager from "../src/components/common/ToastManager";
 import OfflineSyncModal from "../src/components/ui/OfflineSyncModal";
@@ -9,6 +10,7 @@ import { APP_ROLES } from "../src/constants/appRole";
 import { getHomeRouteByRole } from "../src/constants/auth";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { DateRangeProvider } from "../src/context/DateRangeContext";
+import { GlobalLoaderProvider } from "../src/context/GlobalLoaderContext";
 import { NetworkProvider } from "../src/context/NetworkContext";
 
 function RootNavigation() {
@@ -36,6 +38,7 @@ function RootNavigation() {
   if (inWelcome) {
     return (
       <>
+        <GlobalLoader />
         <Stack screenOptions={{ headerShown: false }} />
         <ToastManager />
       </>
@@ -64,6 +67,7 @@ function RootNavigation() {
 
   return (
     <>
+      <GlobalLoader />
       <NetworkBanner />
       <Stack screenOptions={{ headerShown: false }} />
       <ToastManager />
@@ -75,13 +79,15 @@ function RootNavigation() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <DateRangeProvider>
-          <NetworkProvider>
-            <RootNavigation />
-          </NetworkProvider>
-        </DateRangeProvider>
-      </AuthProvider>
+      <GlobalLoaderProvider>
+        <AuthProvider>
+          <DateRangeProvider>
+            <NetworkProvider>
+              <RootNavigation />
+            </NetworkProvider>
+          </DateRangeProvider>
+        </AuthProvider>
+      </GlobalLoaderProvider>
     </SafeAreaProvider>
   );
 }
