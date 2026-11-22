@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -38,7 +41,7 @@ export default function SettleAmountModal({
 }: Props) {
   const [selectedOption, setSelectedOption] = useState<PaymentOption>('CASH');
   const [amountText, setAmountText] = useState('');
-
+  const sheetScrollRef = useRef<ScrollView>(null);
 
 
   useEffect(() => {
@@ -87,16 +90,27 @@ export default function SettleAmountModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.modalOverlay}>
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View style={styles.modalContent}>
-              <View style={styles.handle} />
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoidingView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <ScrollView
+                ref={sheetScrollRef}
+                style={styles.modalContent}
+                contentContainerStyle={styles.modalContentInner}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.handle} />
 
-              <View style={styles.headerRow}>
-                <Text style={styles.title}>Settle Amount</Text>
-                <Text style={styles.dueText}>Due: ₹{dueAmount}</Text>
-              </View>
+                <View style={styles.headerRow}>
+                  <Text style={styles.title}>Settle Amount</Text>
+                  <Text style={styles.dueText}>Due: ₹{dueAmount}</Text>
+                </View>
 
               <Text style={styles.sectionTitle}>PAYMENT OPTION</Text>
               <View style={styles.optionsRow}>
@@ -142,6 +156,12 @@ export default function SettleAmountModal({
                 onChangeText={setAmountText}
                 placeholder="Enter amount"
                 placeholderTextColor={DS.textTertiary}
+                onFocus={() => {
+                  setTimeout(
+                    () => sheetScrollRef.current?.scrollToEnd({ animated: true }),
+                    300,
+                  );
+                }}
               />
 
               <View style={styles.balanceBox}>
@@ -180,10 +200,11 @@ export default function SettleAmountModal({
                   </>
                 )}
               </TouchableOpacity>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+              </ScrollView>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -194,10 +215,18 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
   modalContent: {
+    flexShrink: 1,
+    maxHeight: '90%',
+    width: '100%',
     backgroundColor: DS.card,
     borderTopLeftRadius: RADIUS.xxl,
     borderTopRightRadius: RADIUS.xxl,
+  },
+  modalContentInner: {
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 30,

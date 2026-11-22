@@ -24,6 +24,8 @@ interface AuthContextType {
   isLoading: boolean;
   isSplashCompleted: boolean;
   setSplashCompleted: (completed: boolean) => void;
+  isLoginTransitionActive: boolean;
+  setLoginTransitionActive: (active: boolean) => void;
   login: (token: string, user: AuthUser) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
@@ -39,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSplashCompleted, setSplashCompleted] = useState<boolean>(false);
+  const [isLoginTransitionActive, setLoginTransitionActive] = useState(false);
 
   const checkAuth = async () => {
     try {
@@ -112,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = subscribeToSessionExpired(() => {
+      setLoginTransitionActive(false);
       setToken(null);
       setUser(null);
       setRole(null);
@@ -154,6 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       AGENCY_NAME_KEY,
       "@lpg_cached_customers_v1",
     ]);
+    setLoginTransitionActive(false);
     setToken(null);
     setUser(null);
     setRole(null);
@@ -172,6 +177,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isSplashCompleted,
         setSplashCompleted,
+        isLoginTransitionActive,
+        setLoginTransitionActive,
         login,
         logout,
         checkAuth,

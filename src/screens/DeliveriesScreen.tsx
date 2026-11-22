@@ -9,6 +9,7 @@ import {
   Image,
   InteractionManager,
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -24,6 +25,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppHeader from "../components/common/AppHeader";
+import DashboardLoadingState from "../components/common/DashboardLoadingState";
 import ScreenContainer from "../components/common/ScreenContainer";
 import { showToast } from "../components/common/ToastManager";
 import ConfirmDeliveryModal from "../components/ui/ConfirmDeliveryModal";
@@ -33,7 +35,7 @@ import { AUTH_USER_KEY, getHomeRouteByRole } from "../constants/auth";
 import { DS, PALETTE, RADIUS, TYPO } from "../constants/designSystem";
 import { useDateRange } from "../context/DateRangeContext";
 import { useNetwork } from "../context/NetworkContext";
-import api from "../services/api";
+import api, { isRequestCancellation } from "../services/api";
 import { networkMonitor } from "../services/network/networkMonitor";
 import { deliveryCache } from "../services/offline/deliveryCache";
 import { offlineQueue } from "../services/offline/offlineQueue";
@@ -436,10 +438,11 @@ export default function DeliveriesScreen() {
       console.warn("Confirm delivery API error:", err?.response?.data || err.message);
 
       const isNetworkIssue =
-        !err.response ||
+        !isRequestCancellation(err) &&
+        (!err.response ||
         err.code === "ECONNABORTED" ||
         err.message?.includes("timeout") ||
-        err.message?.includes("Network Error");
+        err.message?.includes("Network Error"));
 
       if (isNetworkIssue) {
         // Fallback to offline queue smoothly
@@ -868,10 +871,11 @@ export default function DeliveriesScreen() {
       console.warn("handleSubmitReturn error:", err?.response?.data || err.message);
 
       const isNetworkIssue =
-        !err.response ||
+        !isRequestCancellation(err) &&
+        (!err.response ||
         err.code === "ECONNABORTED" ||
         err.message?.includes("timeout") ||
-        err.message?.includes("Network Error");
+        err.message?.includes("Network Error"));
 
       if (isNetworkIssue) {
         const activeDriverId = await resolveDriverId();
@@ -1101,7 +1105,7 @@ export default function DeliveriesScreen() {
         return;
       }
 
-      await api.post("/drivers/sales", salePayload, { timeout: 10000 });
+      await api.post("/drivers/sales", salePayload);
 
       // Optimistically decrement local cached batch so immediate next sale has fresh count
       await deliveryCache.decrementBatchPending(
@@ -1126,10 +1130,11 @@ export default function DeliveriesScreen() {
       );
 
       const isNetworkIssue =
-        !err.response ||
+        !isRequestCancellation(err) &&
+        (!err.response ||
         err.code === "ECONNABORTED" ||
         err.message?.includes("timeout") ||
-        err.message?.includes("Network Error");
+        err.message?.includes("Network Error"));
 
       if (isNetworkIssue) {
         const activeDriverId = await resolveDriverId();
@@ -1145,6 +1150,10 @@ export default function DeliveriesScreen() {
             endpoint: "/drivers/sales",
             method: "POST",
             payload: {
+              // Reuse the same request ID from the original attempt. A timeout
+              // only means the response was not received; the server may have
+              // committed this sale already.
+              client_tx_id: clientTxId,
               driver_id: activeDriverId,
               customer_id: foundCustomer.id && Number(foundCustomer.id) > 0 ? Number(foundCustomer.id) : undefined,
               customer_name: foundCustomer.name,
@@ -1240,10 +1249,7 @@ export default function DeliveriesScreen() {
 
         <View style={styles.content}>
           {loading ? (
-            <View style={styles.centerBox}>
-              <ActivityIndicator size="large" color={DS.primary} />
-              <Text style={styles.infoText}>Loading deliveries...</Text>
-            </View>
+            <DashboardLoadingState />
           ) : error ? (
             <View style={styles.centerBox}>
               <Text style={styles.errorText}>{error}</Text>
@@ -2356,24 +2362,7 @@ function ConfirmNewSaleModal({
   // Equality with the sold quantity is enforced only for DOMESTIC deliveries.
   const emptyMismatch = isDomesticBatch && emptyCylinderQty !== orderedQty;
 
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const confirmSaleScrollRef = useRef<ScrollView>(null);
-  const { height: windowHeight } = useWindowDimensions();
-
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const showSub = Keyboard.addListener(showEvent, (e) =>
-      setKeyboardHeight(e.endCoordinates?.height ?? 0),
-    );
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   return (
     <Modal
@@ -2383,14 +2372,11 @@ function ConfirmNewSaleModal({
       onRequestClose={onClose}
     >
       <SafeAreaView style={styles.fullScreenOverlay} edges={["top"]}>
-        <View
-          style={[
-            styles.confirmSaleSheet,
-            {
-              marginBottom: keyboardHeight,
-            },
-          ]}
+        <KeyboardAvoidingView
+          style={styles.confirmSaleKeyboardArea}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+          <View style={styles.confirmSaleSheet}>
             <ScrollView
               ref={confirmSaleScrollRef}
               style={styles.confirmSaleScroll}
@@ -2564,15 +2550,18 @@ function ConfirmNewSaleModal({
                 maxLength={6}
                 value={otp}
                 onChangeText={onOtpChange}
+                placeholder="Enter 6-digit DAC"
+                placeholderTextColor={DS.textTertiary}
+                accessibilityLabel="Customer DAC code, 6 digits"
                 onFocus={() => {
-                  // Give the keyboard time to resize the modal before scrolling
-                  // the focused field above it (especially on Android).
+                  // Scroll after the keyboard resizes the available area so the
+                  // DAC field and verify action stay visible on compact layouts.
                   setTimeout(
                     () =>
                       confirmSaleScrollRef.current?.scrollToEnd({
                         animated: true,
                       }),
-                    250,
+                    350,
                   );
                 }}
               />
@@ -2616,6 +2605,7 @@ function ConfirmNewSaleModal({
               </View>
             </ScrollView>
           </View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
@@ -3145,6 +3135,9 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 18,
   },
+  confirmSaleKeyboardArea: {
+    flex: 1,
+  },
   confirmSaleScroll: {
     flex: 1,
   },
@@ -3263,19 +3256,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   otpInput: {
-    ...TYPO.h5,
+    fontSize: 24,
+    lineHeight: 30,
+    fontWeight: "600",
     alignSelf: "center",
-    width: 240,
-    minHeight: 56,
+    width: "100%",
+    maxWidth: 300,
+    minHeight: 60,
     paddingVertical: 10,
+    paddingHorizontal: 16,
     borderWidth: 2,
     borderColor: DS.primary,
     borderRadius: RADIUS.md,
-    backgroundColor: DS.white,
+    backgroundColor: "#F5F8FF",
     textAlign: "center",
-    letterSpacing: 14,
+    letterSpacing: 9,
     color: DS.textPrimary,
-    marginBottom: 26,
+    marginBottom: 20,
   },
   verifyButton: {
     minHeight: 56,

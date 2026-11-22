@@ -2,15 +2,15 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
   DeviceEventEmitter,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 import AppHeader from '../../components/common/AppHeader';
+import DashboardLoadingState from '../../components/common/DashboardLoadingState';
 import ScreenContainer from '../../components/common/ScreenContainer';
 import { DS, TYPO, RADIUS } from '../../constants/designSystem';
 import { useDateRange } from '../../context/DateRangeContext';
@@ -21,7 +21,7 @@ export default function GodownHomeScreen() {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getGodownDashboardData();
@@ -31,16 +31,12 @@ export default function GodownHomeScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchDashboardData();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       fetchDashboardData();
-    }, [])
+    }, [fetchDashboardData, rangeKey])
   );
 
   useEffect(() => {
@@ -51,11 +47,7 @@ export default function GodownHomeScreen() {
     return () => {
       sub.remove();
     };
-  }, []);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, [rangeKey]);
+  }, [fetchDashboardData]);
 
   const cards = [
     {
@@ -208,9 +200,7 @@ export default function GodownHomeScreen() {
 
       <View style={styles.content}>
         {loading ? (
-          <View style={styles.loaderBox}>
-            <ActivityIndicator color={DS.primary} />
-          </View>
+          <DashboardLoadingState />
         ) : (
           <>
             <View style={styles.cardGrid}>
@@ -241,6 +231,17 @@ export default function GodownHomeScreen() {
                     <Text style={styles.cardValue}>{card.value}</Text>
                     <Text style={styles.cardTitle}>{card.title}</Text>
                   </View>
+
+                  {card.type === 'returned' &&
+                    Number(dashboardData?.pendingReturnRequests || 0) > 0 && (
+                      <View style={styles.pendingBadge}>
+                        <Text style={styles.pendingBadgeText}>
+                          {Number(dashboardData.pendingReturnRequests) > 99
+                            ? '99+'
+                            : dashboardData.pendingReturnRequests}
+                        </Text>
+                      </View>
+                    )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -281,11 +282,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 100,
   },
-  loaderBox: {
-    height: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   cardGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -302,6 +298,24 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    position: 'relative',
+  },
+  pendingBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 5,
+    borderRadius: 10,
+    backgroundColor: DS.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingBadgeText: {
+    ...TYPO.c2,
+    color: DS.white,
+    fontWeight: '700',
   },
   iconBox: {
     width: 38,

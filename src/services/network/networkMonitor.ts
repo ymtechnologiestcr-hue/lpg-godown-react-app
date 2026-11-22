@@ -2,7 +2,7 @@ import NetInfo, {
   NetInfoState,
   NetInfoStateType,
 } from "@react-native-community/netinfo";
-import { API_SERVER_ROOT } from "../api";
+import { API_SERVER_ROOT } from "../apiConfig";
 
 export type NetworkStatus = "ONLINE" | "SLOW" | "OFFLINE";
 
@@ -215,7 +215,9 @@ class NetworkMonitor {
 
   /**
    * Helper that API interceptor or caller can use to report a network timeout/failure.
-   * If an API call fails with network error, immediately degrade network status to SLOW or OFFLINE.
+   * Request timeouts can come from slow server work while the connection is
+   * healthy, so use the health probe as the source of truth instead of marking
+   * every failed business request as a poor network.
    */
   public reportRequestFailure(error: any) {
     const isNetworkError =
@@ -224,31 +226,20 @@ class NetworkMonitor {
       error?.message?.toLowerCase().includes("timeout");
 
     if (isNetworkError) {
-      // Degrade state immediately to protect driver from hanging
-      this.updateState({
-        isSlowNetwork: true,
-        status: "SLOW",
-        lastCheckedAt: Date.now(),
-      });
-      // Fire a ping to verify actual connectivity
+      // The ping will set ONLINE, SLOW, or OFFLINE based on actual reachability.
       this.measureLatency();
     }
   }
 
   public reportRequestSuccess(durationMs?: number) {
-    if (durationMs && durationMs > SLOW_LATENCY_THRESHOLD_MS) {
-      this.updateState({
-        isSlowNetwork: true,
-        status: "SLOW",
-        latencyMs: durationMs,
-        lastCheckedAt: Date.now(),
-      });
-    } else if (this.currentState.status === "SLOW" && durationMs && durationMs < 1000) {
-      // Recovered quickly
+    // Endpoint duration includes server work (DB transactions, OTP/payment
+    // processing, etc.), so it is not a reliable measure of network quality.
+    // A quick successful request can confirm recovery; slow status comes from
+    // the dedicated health ping instead.
+    if (this.currentState.status === "SLOW" && durationMs && durationMs < 1000) {
       this.updateState({
         isSlowNetwork: false,
         status: "ONLINE",
-        latencyMs: durationMs,
         lastCheckedAt: Date.now(),
       });
     }

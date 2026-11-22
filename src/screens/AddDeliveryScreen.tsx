@@ -20,7 +20,7 @@ import ScreenContainer from "../components/common/ScreenContainer";
 import { showToast } from "../components/common/ToastManager";
 import { AUTH_USER_KEY } from "../constants/auth";
 import { DS, EYEBROW, PALETTE, RADIUS, TYPO } from "../constants/designSystem";
-import api from "../services/api";
+import api, { isRequestCancellation } from "../services/api";
 import { offlineQueue } from "../services/offline/offlineQueue";
 
 type Customer = {
@@ -389,10 +389,11 @@ export default function AddDeliveryScreen() {
       }
     } catch (err: any) {
       const isNetworkIssue =
-        !err.response ||
+        !isRequestCancellation(err) &&
+        (!err.response ||
         err.code === "ECONNABORTED" ||
         err.message?.includes("timeout") ||
-        err.message?.includes("Network Error");
+        err.message?.includes("Network Error"));
 
       if (isNetworkIssue && selectedCustomer) {
         await offlineQueue.enqueue({

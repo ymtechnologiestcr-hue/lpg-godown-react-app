@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DS, TYPO, EYEBROW, RADIUS, PALETTE, WEIGHT } from '../../constants/designSystem';
+import DashboardLoadingState from '../../components/common/DashboardLoadingState';
 import {
   getPurchaseBootstrap,
   getPurchaseDashboard,
@@ -84,6 +85,14 @@ export default function PurchaseHomeScreen() {
   const summary = dashboard?.summary;
   const recentTrips = dashboard?.recentTrips ?? [];
   const activeTrip = dashboard?.activeTrip;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safeArea, styles.loadingSafeArea]} edges={['top']}>
+        <DashboardLoadingState />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -290,6 +299,10 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: DS.primary,
+  },
+  loadingSafeArea: {
+    backgroundColor: DS.background,
+    paddingHorizontal: 16,
   },
   scroll: {
     flex: 1,

@@ -286,12 +286,10 @@ export default function EmptyCylindersScreen() {
       });
 
       if (response.data?.success) {
+        setReturnModalVisible(false);
+        resetModal();
+        void fetchTodayData();
         Alert.alert('Success', 'Return request sent for approval');
-        // Clear the current selection and refresh the returnable list so a
-        // fully-returned product drops off and the next one can be picked.
-        setSelectedProduct(null);
-        setQuantity('');
-        await Promise.all([fetchReturnableProducts(), fetchTodayData()]);
       } else {
         Alert.alert('Error', response.data?.message || 'Failed to create request');
       }

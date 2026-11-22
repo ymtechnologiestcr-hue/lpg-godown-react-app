@@ -1,43 +1,50 @@
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AuthBackdrop } from '../components/auth/AuthBackdrop';
 import { showToast } from '../components/common/ToastManager';
 import { AppRole } from '../constants/appRole';
-import {
-  getHomeRouteByRole,
-  isSupportedMobileRole,
-} from '../constants/auth';
-import { DS, TYPO, RADIUS, WEIGHT } from '../constants/designSystem';
+import { isSupportedMobileRole } from '../constants/auth';
+import { AUTH_COLORS } from '../constants/authTheme';
 import { useAuth } from '../context/AuthContext';
 import {
   identifyAuthMethod,
   loginWithPassword,
-  requestOtp,
-  verifyOtp,
 } from '../services/authService';
 
-type AuthStep = 'IDENTIFIER' | 'METHOD' | 'PASSWORD' | 'OTP';
+type AuthStep = 'IDENTIFIER' | 'PASSWORD';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, setSplashCompleted, setLoginTransitionActive } = useAuth();
 
   const [step, setStep] = useState<AuthStep>('IDENTIFIER');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
-  const [otp, setOtp] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [masked, setMasked] = useState('');
-  const [availablePassword, setAvailablePassword] = useState(false);
-  const [availableOtp, setAvailableOtp] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleChangeEmail = () => {
+    setPassword('');
+    setShowPassword(false);
+    setMasked('');
+    setStep('IDENTIFIER');
+  };
 
   const handleIdentify = async () => {
     if (!identifier.trim()) {
@@ -53,9 +60,7 @@ export default function LoginScreen() {
         return;
       }
       setMasked(res.data?.masked || '');
-      setAvailablePassword(Boolean(res.data?.availableMethods?.password));
-      setAvailableOtp(Boolean(res.data?.availableMethods?.otp));
-      setStep('METHOD');
+      setStep('PASSWORD');
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Unable to identify user';
       showToast(message, 'error');
@@ -73,10 +78,11 @@ export default function LoginScreen() {
       return;
     }
 
+    setSplashCompleted(true);
+    setLoginTransitionActive(true);
     await login(payload.token, payload.user as any);
     showToast('Login successful!', 'success');
-    const destination = getHomeRouteByRole(payload.user.role);
-    router.replace(destination as never);
+    router.replace('/login-success' as never);
   };
 
   const handlePasswordLogin = async () => {
@@ -94,6 +100,7 @@ export default function LoginScreen() {
         showToast(res.message || 'Login failed', 'error');
       }
     } catch (error: any) {
+      setLoginTransitionActive(false);
       const message = error?.response?.data?.message || error?.message || 'Unable to login with password';
       showToast(message, 'error');
     } finally {
@@ -101,218 +108,275 @@ export default function LoginScreen() {
     }
   };
 
-  const handleSendOtp = async () => {
-    try {
-      setLoading(true);
-      await requestOtp(identifier.trim());
-      setStep('OTP');
-      showToast('OTP sent! Enter OTP to continue.', 'info');
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || 'Unable to send OTP';
-      showToast(message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (!otp.trim()) {
-      showToast('Enter OTP', 'error');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const res = await verifyOtp(identifier.trim(), otp.trim());
-      if (res.success && res.token && res.user) {
-        await completeLogin({ token: res.token, user: res.user as any });
-      } else {
-        showToast(res.message || 'Invalid OTP', 'error');
-      }
-    } catch (error: any) {
-      const message = error?.response?.data?.message || error?.message || 'Invalid OTP';
-      showToast(message, 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
-    <View style={styles.screen}>
-      <View style={styles.card}>
-        <Text style={styles.title}>LPG Role Login</Text>
-        <Text style={styles.subtitle}>Driver, Godown Manager, Purchase Manager</Text>
+    <AuthBackdrop>
+      <StatusBar barStyle="dark-content" backgroundColor={AUTH_COLORS.background} />
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <KeyboardAvoidingView
+          style={styles.keyboardArea}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.brandHeader}>
+              <View style={styles.brandIcon}>
+                <Ionicons name="flame" size={24} color={AUTH_COLORS.brandRed} />
+              </View>
+              <View style={styles.brandCopy}>
+                <View style={styles.brandNameRow}>
+                  <Text style={styles.brandName}>LPG Mitra</Text>
+                  <Ionicons name="checkmark-circle" size={15} color={AUTH_COLORS.accentBlue} />
+                </View>
+                <Text style={styles.brandCaption}>Smart LPG distribution &amp; stock tracking</Text>
+              </View>
+            </View>
 
-        {(step === 'IDENTIFIER' || step === 'METHOD' || step === 'PASSWORD' || step === 'OTP') && (
-          <>
-            <Text style={styles.label}>Email or Phone</Text>
-            <TextInput
-              style={styles.input}
-              value={identifier}
-              onChangeText={setIdentifier}
-              editable={step === 'IDENTIFIER'}
-              placeholder="Enter email or phone"
-              autoCapitalize="none"
-            />
-          </>
-        )}
+            <View style={styles.card}>
+              <Text style={styles.title}>{step === 'IDENTIFIER' ? 'Welcome back' : 'Enter your password'}</Text>
+              <Text style={styles.subtitle}>Driver, Godown Manager, Purchase Manager</Text>
 
-        {step === 'IDENTIFIER' && (
-          <TouchableOpacity style={styles.button} onPress={handleIdentify} disabled={loading}>
-            {loading ? <ActivityIndicator color={DS.white} /> : <Text style={styles.buttonText}>Continue</Text>}
-          </TouchableOpacity>
-        )}
+              <Text style={styles.label}>Email or phone</Text>
+              <TextInput
+                style={styles.input}
+                value={identifier}
+                onChangeText={setIdentifier}
+                editable={step === 'IDENTIFIER'}
+                placeholder="Enter email or phone"
+                placeholderTextColor={AUTH_COLORS.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                returnKeyType={step === 'IDENTIFIER' ? 'go' : 'next'}
+                onSubmitEditing={step === 'IDENTIFIER' ? handleIdentify : undefined}
+              />
 
-        {step === 'METHOD' && (
-          <>
-            <Text style={styles.info}>Authenticate as {masked || 'user'}</Text>
-            {availablePassword && (
-              <TouchableOpacity style={styles.button} onPress={() => setStep('PASSWORD')} disabled={loading}>
-                <Text style={styles.buttonText}>Login with Password</Text>
-              </TouchableOpacity>
-            )}
-            {availableOtp && (
-              <TouchableOpacity style={styles.secondaryButton} onPress={handleSendOtp} disabled={loading}>
-                {loading ? <ActivityIndicator color={DS.primary} /> : <Text style={styles.secondaryButtonText}>Login with OTP</Text>}
-              </TouchableOpacity>
-            )}
-          </>
-        )}
+              {step === 'IDENTIFIER' && (
+                <TouchableOpacity
+                  style={styles.button}
+                  onPress={handleIdentify}
+                  disabled={loading}
+                  activeOpacity={0.88}
+                >
+                  {loading ? <ActivityIndicator color={AUTH_COLORS.white} /> : (
+                    <>
+                      <Text style={styles.buttonText}>Continue</Text>
+                      <Ionicons name="arrow-forward" size={18} color={AUTH_COLORS.white} />
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
 
-        {step === 'PASSWORD' && (
-          <>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              placeholder="Enter password"
-            />
-            <TouchableOpacity style={styles.button} onPress={handlePasswordLogin} disabled={loading}>
-              {loading ? <ActivityIndicator color={DS.white} /> : <Text style={styles.buttonText}>Login</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.linkButton} onPress={() => setStep('METHOD')}>
-              <Text style={styles.linkText}>Back</Text>
-            </TouchableOpacity>
-          </>
-        )}
+              {step === 'PASSWORD' && (
+                <>
+                  <View style={styles.accountRow}>
+                    <Ionicons name="person-circle-outline" size={17} color={AUTH_COLORS.secondary} />
+                    <Text style={styles.info}>Signing in as {masked || identifier}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.changeEmailButton}
+                    onPress={handleChangeEmail}
+                    disabled={loading}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.linkText}>Change email</Text>
+                  </TouchableOpacity>
 
-        {step === 'OTP' && (
-          <>
-            <Text style={styles.label}>OTP</Text>
-            <TextInput
-              style={styles.input}
-              value={otp}
-              onChangeText={setOtp}
-              keyboardType="number-pad"
-              placeholder="Enter 6-digit OTP"
-              maxLength={6}
-            />
-            <TouchableOpacity style={styles.button} onPress={handleVerifyOtp} disabled={loading}>
-              {loading ? <ActivityIndicator color={DS.white} /> : <Text style={styles.buttonText}>Verify OTP</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.linkButton} onPress={handleSendOtp}>
-              <Text style={styles.linkText}>Resend OTP</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </View>
+                  <Text style={styles.label}>Password</Text>
+                  <View style={styles.passwordInputContainer}>
+                    <TextInput
+                      style={[styles.input, styles.passwordInput]}
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                      placeholder="Enter password"
+                      placeholderTextColor={AUTH_COLORS.muted}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      returnKeyType="go"
+                      onSubmitEditing={handlePasswordLogin}
+                    />
+                    <TouchableOpacity
+                      style={styles.passwordVisibilityButton}
+                      onPress={() => setShowPassword((visible) => !visible)}
+                      accessibilityRole="button"
+                      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                      accessibilityState={{ selected: showPassword }}
+                    >
+                      <Ionicons
+                        name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                        size={21}
+                        color={AUTH_COLORS.secondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.button}
+                    onPress={handlePasswordLogin}
+                    disabled={loading}
+                    activeOpacity={0.88}
+                  >
+                    {loading ? <ActivityIndicator color={AUTH_COLORS.white} /> : (
+                      <Text style={styles.buttonText}>Login</Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </AuthBackdrop>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#1E65FF', // Matching welcome screen blue
+    paddingHorizontal: 20,
+  },
+  keyboardArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    paddingVertical: 28,
+  },
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 22,
+    paddingHorizontal: 3,
+  },
+  brandIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 15,
+    backgroundColor: '#FFF0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  brandCopy: {
+    flex: 1,
+  },
+  brandNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  brandName: {
+    color: AUTH_COLORS.navy,
+    fontSize: 20,
+    lineHeight: 25,
+    fontWeight: '700',
+  },
+  brandCaption: {
+    color: AUTH_COLORS.secondary,
+    fontSize: 10,
+    lineHeight: 15,
   },
   card: {
-    backgroundColor: DS.card,
-    borderRadius: RADIUS.xl, // Softer, larger radius
-    padding: 28, // More spacious padding inside the card
-    transform: [{ translateY: -60 }], // Place 60px above current center position
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: '#25354A',
+    shadowOffset: { width: 0, height: 9 },
+    shadowOpacity: 0.09,
     shadowRadius: 24,
-    elevation: 12,
-    borderWidth: 0, // Clean borderless look
+    elevation: 5,
   },
   title: {
-    ...TYPO.h5,
-    color: DS.textPrimary,
+    color: AUTH_COLORS.navy,
+    fontSize: 23,
+    lineHeight: 30,
+    fontWeight: '700',
     marginBottom: 4,
   },
   subtitle: {
-    ...TYPO.b3,
-    marginBottom: 24,
-    color: DS.textSecondary,
+    color: AUTH_COLORS.secondary,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 22,
   },
   label: {
-    ...TYPO.c2,
-    color: DS.textSecondary,
-    marginBottom: 8,
+    color: AUTH_COLORS.secondary,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    marginBottom: 7,
   },
   input: {
-    height: 52, // Slightly taller input for professional look
-    borderRadius: RADIUS.md,
+    height: 50,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: DS.borderStrong,
-    backgroundColor: DS.surface,
-    paddingHorizontal: 16,
-    fontSize: 15,
-    fontWeight: WEIGHT.medium,
-    color: DS.textPrimary,
-    marginBottom: 16,
+    borderColor: AUTH_COLORS.border,
+    backgroundColor: AUTH_COLORS.input,
+    paddingHorizontal: 14,
+    fontSize: 14,
+    fontWeight: '500',
+    color: AUTH_COLORS.text,
+    marginBottom: 15,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 1,
+    marginBottom: 1,
   },
   info: {
-    ...TYPO.c1,
-    color: DS.textSecondary,
-    marginBottom: 12,
+    color: AUTH_COLORS.secondary,
+    fontSize: 12,
+    lineHeight: 17,
   },
-  button: {
-    height: 52, // Taller button
-    borderRadius: RADIUS.md,
-    backgroundColor: DS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    shadowColor: DS.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  buttonText: {
-    ...TYPO.b2, // Slightly larger bold text
-    fontWeight: WEIGHT.semibold,
-    color: DS.white,
-  },
-  secondaryButton: {
-    height: 52,
-    borderRadius: RADIUS.md,
-    borderWidth: 1.5,
-    borderColor: DS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  secondaryButtonText: {
-    ...TYPO.b2,
-    fontWeight: WEIGHT.semibold,
-    color: DS.primary,
-  },
-  linkButton: {
-    alignItems: 'center',
-    marginTop: 16,
-    paddingVertical: 8,
+  changeEmailButton: {
+    alignSelf: 'flex-start',
+    paddingVertical: 5,
+    marginBottom: 13,
   },
   linkText: {
-    ...TYPO.b3,
-    fontWeight: WEIGHT.semibold,
-    color: DS.primary,
+    color: AUTH_COLORS.brandRed,
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  passwordInputContainer: {
+    position: 'relative',
+  },
+  passwordInput: {
+    paddingRight: 48,
+  },
+  passwordVisibilityButton: {
+    position: 'absolute',
+    right: 7,
+    top: 0,
+    height: 50,
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  button: {
+    minHeight: 50,
+    borderRadius: 12,
+    backgroundColor: AUTH_COLORS.brandRed,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 9,
+    marginTop: 5,
+    shadowColor: AUTH_COLORS.brandRedDark,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  buttonText: {
+    color: AUTH_COLORS.white,
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '600',
   },
 });

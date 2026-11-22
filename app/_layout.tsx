@@ -15,7 +15,13 @@ import { NetworkProvider } from "../src/context/NetworkContext";
 
 function RootNavigation() {
   const segments = useSegments();
-  const { isAuthenticated, role, isLoading, isSplashCompleted } = useAuth();
+  const {
+    isAuthenticated,
+    role,
+    isLoading,
+    isSplashCompleted,
+    isLoginTransitionActive,
+  } = useAuth();
 
   const inLogin = segments[0] === "login";
   const inWelcome = segments[0] === "welcome";
@@ -34,19 +40,30 @@ function RootNavigation() {
     );
   }
 
-  // While on the welcome/splash screen, ALWAYS render Stack so it can animate and navigate
+  // Authenticated users should never be left on welcome or login, even after a cold start.
+  if (isAuthenticated && role) {
+    if (
+      inWelcome ||
+      (inLogin && !isLoginTransitionActive) ||
+      (isAtRoot && role !== APP_ROLES.DRIVER)
+    ) {
+      return <Redirect href={getHomeRouteByRole(role) as any} />;
+    }
+  }
+
+  // Keep the welcome route available to signed-out users until they continue.
   if (inWelcome) {
     return (
       <>
         <GlobalLoader />
-        <Stack screenOptions={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false, animation: "fade_from_bottom" }} />
         <ToastManager />
       </>
     );
   }
 
   // 1. Initial app start: if splash has not completed, redirect to /welcome
-  if (!isSplashCompleted) {
+  if (!isAuthenticated && !isSplashCompleted) {
     return <Redirect href="/welcome" />;
   }
 
@@ -55,21 +72,11 @@ function RootNavigation() {
     return <Redirect href="/login" />;
   }
 
-  // 3. Authenticated users: redirect away from login and root to home route
-  if (isAuthenticated && role) {
-    if (inLogin) {
-      return <Redirect href={getHomeRouteByRole(role) as any} />;
-    }
-    if (isAtRoot && role !== APP_ROLES.DRIVER) {
-      return <Redirect href={getHomeRouteByRole(role) as any} />;
-    }
-  }
-
   return (
     <>
       <GlobalLoader />
       <NetworkBanner />
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false, animation: "fade_from_bottom" }} />
       <ToastManager />
       <OfflineSyncModal />
     </>

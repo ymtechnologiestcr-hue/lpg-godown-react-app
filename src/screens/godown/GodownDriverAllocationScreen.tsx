@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -58,6 +59,10 @@ export default function GodownDriverAllocationScreen() {
   const [quantities, setQuantities] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const allocationRequestRef = useRef<{
+    fingerprint: string;
+    clientTxId: string;
+  } | null>(null);
 
   const fetchProducts = async () => {
     try {
@@ -110,10 +115,39 @@ export default function GodownDriverAllocationScreen() {
         }))
         .filter((item) => item.quantity > 0);
 
+      const fingerprint = JSON.stringify({ driver_id: Number(id), items });
+      if (allocationRequestRef.current?.fingerprint !== fingerprint) {
+        const storageKey = `@lpg_pending_driver_allocation_${id}`;
+        let savedRequest: { fingerprint: string; clientTxId: string } | null = null;
+        try {
+          const raw = await AsyncStorage.getItem(storageKey);
+          savedRequest = raw ? JSON.parse(raw) : null;
+        } catch {
+          savedRequest = null;
+        }
+        allocationRequestRef.current =
+          savedRequest?.fingerprint === fingerprint
+            ? savedRequest
+            : {
+                fingerprint,
+                clientTxId: `alloc_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`,
+              };
+      }
+
+      const storageKey = `@lpg_pending_driver_allocation_${id}`;
+      await AsyncStorage.setItem(
+        storageKey,
+        JSON.stringify(allocationRequestRef.current),
+      );
+
       const result = await createDriverAllocation({
         driver_id: Number(id),
+        client_tx_id: allocationRequestRef.current.clientTxId,
         items,
       });
+
+      allocationRequestRef.current = null;
+      await AsyncStorage.removeItem(storageKey);
 
       DeviceEventEmitter.emit("DRIVER_ALLOCATION_CREATED");
 

@@ -3,6 +3,7 @@ import { create } from "axios";
 import { showToast } from "../components/common/ToastManager";
 import { AUTH_TOKEN_KEY } from "../constants/auth";
 import { DATE_RANGE_STORAGE_KEY } from "../context/DateRangeContext";
+import { API_BASE_URL } from "./apiConfig";
 import { globalLoader } from "./loader/globalLoaderService";
 import { networkMonitor } from "./network/networkMonitor";
 import {
@@ -10,16 +11,12 @@ import {
   isAuthSessionExpired,
 } from "./authSession";
 
-// Production builds set EXPO_PUBLIC_API_BASE_URL (must include the /api suffix,
-// e.g. https://<your-app>.up.railway.app/api). Falls back to the local machine
-// IP for on-device development.
-// Strip any trailing slash(es) so endpoints like `/auth/identify` never join
-// into a double slash (`https://host//auth/identify`), which fails to match
-// the backend routes.
-export const API_BASE_URL = (
-  process.env.EXPO_PUBLIC_API_BASE_URL || "http://localhost:5001/api"
-).replace(/\/+$/, "");
-export const API_SERVER_ROOT = API_BASE_URL.replace(/\/api\/?$/, "");
+export { API_BASE_URL, API_SERVER_ROOT } from "./apiConfig";
+
+export const isRequestCancellation = (error: any) =>
+  error?.code === "ERR_CANCELED" ||
+  error?.name === "CanceledError" ||
+  error?.name === "AbortError";
 
 const isTokenExpiryMessage = (data: any) => {
   const responseText = [data?.message, data?.error, data?.code]
@@ -33,7 +30,10 @@ const isTokenExpiryMessage = (data: any) => {
 
 const api = create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  // Driver mutations can take longer than 10s while the server commits the
+  // sale, updates stock, and records payment. A short timeout turns a slow
+  // response into an unsafe offline replay even when the request succeeded.
+  timeout: 30000,
 });
 
 api.interceptors.request.use(async (config) => {
@@ -140,10 +140,7 @@ api.interceptors.response.use(
     }
 
     const startTime = (response.config as any)?._requestStartTime;
-    if (startTime) {
-      const duration = Date.now() - startTime;
-      networkMonitor.reportRequestSuccess(duration);
-    }
+    if (startTime) networkMonitor.reportRequestSuccess(Date.now() - startTime);
 
     // If the response explicitly contains a success message, show it
     if (response.data && response.data.success && response.data.message) {
@@ -162,12 +159,12 @@ api.interceptors.response.use(
       (error.config as any)._stopLoader();
     }
 
-    // Report failure/timeout to network monitor
-    networkMonitor.reportRequestFailure(error);
-
-    if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
+    if (isRequestCancellation(error)) {
       return Promise.reject(error);
     }
+
+    // User/navigation cancellation is not evidence of a bad connection.
+    networkMonitor.reportRequestFailure(error);
 
     const isRequestTimeout =
       !error.response &&

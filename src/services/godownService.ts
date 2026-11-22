@@ -97,6 +97,7 @@ export const getDriverDayWiseSummary = async (driverId: number) => {
 
 export const createDriverAllocation = async (payload: {
   driver_id: number;
+  client_tx_id: string;
   items: {
     product_id: number;
     quantity: number;
