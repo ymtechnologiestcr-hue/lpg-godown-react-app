@@ -67,8 +67,8 @@ export default function PurchaseTripsScreen() {
         setLoading(true);
       }
 
-      const bootstrap = await getPurchaseBootstrap();
-      const tripList = await getPurchaseTrips(bootstrap.manager.id);
+      const bootstrap = await getPurchaseBootstrap(withRefresh);
+      const tripList = await getPurchaseTrips(bootstrap.manager.id, withRefresh);
       setTrips(tripList);
     } catch (error) {
       console.log('Purchase trips error:', error);

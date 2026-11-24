@@ -86,12 +86,12 @@ export default function PurchaseExpensesScreen() {
         setLoading(true);
       }
 
-      const bootstrap = await getPurchaseBootstrap();
+      const bootstrap = await getPurchaseBootstrap(withRefresh);
       setUserId(bootstrap.manager.id);
 
       const [expenseList, trip] = await Promise.all([
-        getPurchaseExpenses(bootstrap.manager.id),
-        getActivePurchaseTrip(bootstrap.manager.id),
+        getPurchaseExpenses(bootstrap.manager.id, withRefresh),
+        getActivePurchaseTrip(bootstrap.manager.id, withRefresh),
       ]);
 
       setExpenses(expenseList);

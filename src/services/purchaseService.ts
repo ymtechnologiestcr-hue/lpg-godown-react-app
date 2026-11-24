@@ -8,14 +8,14 @@ import type {
   PurchaseTripSummary,
 } from "../types";
 import api, { API_BASE_URL } from "./api";
+import { fetchCachedQuery } from "./queryClient";
 
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import { AUTH_TOKEN_KEY } from "../constants/auth";
+import { getCachedAuthToken } from "./storage/appStorageCache";
 
 // Reliable fetch wrapper for FormData uploads on React Native to bypass Axios bugs.
 const fetchUpload = async (url: string, formData: FormData) => {
-  const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+  const token = await getCachedAuthToken();
   const res = await fetch(`${API_BASE_URL}${url}`, {
     method: "POST",
     headers: {
@@ -99,20 +99,32 @@ export const startEmptyCylinderTrip = async (payload: {
   return res.data;
 };
 
-export const getPurchaseBootstrap = async () => {
-  const res = await api.get<{ success: boolean; data: PurchaseBootstrap }>(
-    "/purchase/bootstrap",
+export const getPurchaseBootstrap = (forceRefresh = false) =>
+  fetchCachedQuery(
+    ["purchase", "bootstrap"],
+    async () => {
+      const res = await api.get<{ success: boolean; data: PurchaseBootstrap }>(
+        "/purchase/bootstrap",
+      );
+      return res.data.data;
+    },
+    60_000,
+    forceRefresh,
   );
-  return res.data.data;
-};
 
-export const getPurchaseDashboard = async (userId: number) => {
-  const res = await api.get<{ success: boolean; data: PurchaseDashboard }>(
-    "/purchase/dashboard",
-    { params: { userId } },
+export const getPurchaseDashboard = (userId: number, forceRefresh = false) =>
+  fetchCachedQuery(
+    ["purchase", "dashboard", userId],
+    async () => {
+      const res = await api.get<{ success: boolean; data: PurchaseDashboard }>(
+        "/purchase/dashboard",
+        { params: { userId } },
+      );
+      return res.data.data;
+    },
+    30_000,
+    forceRefresh,
   );
-  return res.data.data;
-};
 
 // --- START TRIP ---
 export const startPurchaseTrip = async (payload: {
@@ -205,36 +217,60 @@ export const submitPurchaseTrip = async (payload: {
   return res.data;
 };
 
-export const getActivePurchaseTrip = async (userId: number) => {
-  const res = await api.get<{
-    success: boolean;
-    data: PurchaseTripOverview | null;
-  }>("/purchase/trips/active", { params: { userId } });
-  return res.data.data;
-};
-
-export const getPurchaseTrips = async (userId: number) => {
-  const res = await api.get<{ success: boolean; data: PurchaseTripSummary[] }>(
-    "/purchase/trips",
-    { params: { userId } },
+export const getActivePurchaseTrip = (userId: number, forceRefresh = false) =>
+  fetchCachedQuery(
+    ["purchase", "active-trip", userId],
+    async () => {
+      const res = await api.get<{
+        success: boolean;
+        data: PurchaseTripOverview | null;
+      }>("/purchase/trips/active", { params: { userId } });
+      return res.data.data;
+    },
+    15_000,
+    forceRefresh,
   );
-  return res.data.data;
-};
 
-export const getPurchaseLoads = async (userId: number) => {
-  const res = await api.get<{ success: boolean; data: PurchaseLoad[] }>(
-    "/purchase/loads",
-    { params: { userId } },
+export const getPurchaseTrips = (userId: number, forceRefresh = false) =>
+  fetchCachedQuery(
+    ["purchase", "trips", userId],
+    async () => {
+      const res = await api.get<{
+        success: boolean;
+        data: PurchaseTripSummary[];
+      }>("/purchase/trips", { params: { userId } });
+      return res.data.data;
+    },
+    30_000,
+    forceRefresh,
   );
-  return res.data.data;
-};
 
-export const getPurchaseLoadDetail = async (loadId: string | number) => {
-  const res = await api.get<{ success: boolean; data: PurchaseLoad }>(
-    `/purchase/loads/${loadId}`,
+export const getPurchaseLoads = (userId: number, forceRefresh = false) =>
+  fetchCachedQuery(
+    ["purchase", "loads", userId],
+    async () => {
+      const res = await api.get<{ success: boolean; data: PurchaseLoad[] }>(
+        "/purchase/loads",
+        { params: { userId } },
+      );
+      return res.data.data;
+    },
+    30_000,
+    forceRefresh,
   );
-  return res.data.data;
-};
+
+export const getPurchaseLoadDetail = (loadId: string | number, forceRefresh = false) =>
+  fetchCachedQuery(
+    ["purchase", "load-detail", loadId],
+    async () => {
+      const res = await api.get<{ success: boolean; data: PurchaseLoad }>(
+        `/purchase/loads/${loadId}`,
+      );
+      return res.data.data;
+    },
+    30_000,
+    forceRefresh,
+  );
 
 export const createPurchaseLoad = async (payload: {
   tripId: number;
@@ -283,13 +319,19 @@ export const cancelPurchaseLoad = async (loadId: string | number) => {
   return res.data;
 };
 
-export const getPurchaseExpenses = async (userId: number) => {
-  const res = await api.get<{ success: boolean; data: PurchaseExpense[] }>(
-    "/purchase/expenses",
-    { params: { userId } },
+export const getPurchaseExpenses = (userId: number, forceRefresh = false) =>
+  fetchCachedQuery(
+    ["purchase", "expenses", userId],
+    async () => {
+      const res = await api.get<{ success: boolean; data: PurchaseExpense[] }>(
+        "/purchase/expenses",
+        { params: { userId } },
+      );
+      return res.data.data;
+    },
+    30_000,
+    forceRefresh,
   );
-  return res.data.data;
-};
 
 export const createPurchaseExpense = async (payload: {
   category: string;

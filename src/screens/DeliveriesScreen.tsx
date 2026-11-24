@@ -34,7 +34,7 @@ import { APP_ROLES } from "../constants/appRole";
 import { AUTH_USER_KEY, getHomeRouteByRole } from "../constants/auth";
 import { DS, PALETTE, RADIUS, TYPO } from "../constants/designSystem";
 import { useDateRange } from "../context/DateRangeContext";
-import { useNetwork } from "../context/NetworkContext";
+import { useNetworkActions, useNetworkStatus } from "../context/NetworkContext";
 import api, { isRequestCancellation } from "../services/api";
 import { networkMonitor } from "../services/network/networkMonitor";
 import { deliveryCache } from "../services/offline/deliveryCache";
@@ -109,7 +109,8 @@ export default function DeliveriesScreen() {
   const { range, rangeKey } = useDateRange();
   const rangeStartDate = range?.startDate;
   const rangeEndDate = range?.endDate;
-  const { isOnline, isSlowNetwork, syncNow } = useNetwork();
+  const { isOnline, isSlowNetwork } = useNetworkStatus();
+  const { syncNow } = useNetworkActions();
   const [driverId, setDriverId] = useState<number | null>(null);
   const driverIdRef = useRef<number | null>(driverId);
   const [agencyId, setAgencyId] = useState<number | null>(null);
@@ -961,6 +962,10 @@ export default function DeliveriesScreen() {
       return;
     }
 
+    // Keep the same id for the direct request and its offline retry if the
+    // server commits the sale but the response times out.
+    const clientTxId = `ctx_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
     try {
       setCreateSaleLoading(true);
 
@@ -998,8 +1003,6 @@ export default function DeliveriesScreen() {
 
       const unitPrice = Number(selectedBatch.productPrice || 0);
       const totalAmount = unitPrice * orderedQty;
-      const clientTxId = `ctx_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-
       const salePayload = {
         client_tx_id: clientTxId,
         driver_id: activeDriverId,
@@ -2362,8 +2365,6 @@ function ConfirmNewSaleModal({
   // Equality with the sold quantity is enforced only for DOMESTIC deliveries.
   const emptyMismatch = isDomesticBatch && emptyCylinderQty !== orderedQty;
 
-  const confirmSaleScrollRef = useRef<ScrollView>(null);
-
   return (
     <Modal
       visible={visible}
@@ -2378,7 +2379,6 @@ function ConfirmNewSaleModal({
         >
           <View style={styles.confirmSaleSheet}>
             <ScrollView
-              ref={confirmSaleScrollRef}
               style={styles.confirmSaleScroll}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -2417,6 +2417,21 @@ function ConfirmNewSaleModal({
                   {customer?.phone || ""}
                 </Text>
               </View>
+
+              <Text style={styles.inputLabel}>Customer DAC Code (6-digit)</Text>
+              <Text style={styles.otpHelp}>
+                Ask the customer for the DAC Code.
+              </Text>
+              <TextInput
+                style={styles.otpInput}
+                keyboardType="number-pad"
+                maxLength={6}
+                value={otp}
+                onChangeText={onOtpChange}
+                placeholder="Enter 6-digit DAC"
+                placeholderTextColor={DS.textTertiary}
+                accessibilityLabel="Customer DAC code, 6 digits"
+              />
 
               <Text style={styles.inputLabel}>Payment Method</Text>
 
@@ -2538,33 +2553,6 @@ function ConfirmNewSaleModal({
                   {orderedQty}).
                 </Text>
               )}
-
-              <Text style={styles.inputLabel}>Customer DAC Code (6-digit)</Text>
-              <Text style={styles.otpHelp}>
-                Ask the customer for the DAC Code.
-              </Text>
-
-              <TextInput
-                style={styles.otpInput}
-                keyboardType="number-pad"
-                maxLength={6}
-                value={otp}
-                onChangeText={onOtpChange}
-                placeholder="Enter 6-digit DAC"
-                placeholderTextColor={DS.textTertiary}
-                accessibilityLabel="Customer DAC code, 6 digits"
-                onFocus={() => {
-                  // Scroll after the keyboard resizes the available area so the
-                  // DAC field and verify action stay visible on compact layouts.
-                  setTimeout(
-                    () =>
-                      confirmSaleScrollRef.current?.scrollToEnd({
-                        animated: true,
-                      }),
-                    350,
-                  );
-                }}
-              />
 
               <View style={styles.actionRow}>
                 <TouchableOpacity

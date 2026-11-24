@@ -1,9 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Image,
   Modal,
@@ -13,7 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { AGENCY_NAME_KEY, AUTH_USER_KEY } from "../../constants/auth";
 import { DS, RADIUS, TYPO, WEIGHT } from "../../constants/designSystem";
 import { useAuth } from "../../context/AuthContext";
 import { useDateRange } from "../../context/DateRangeContext";
@@ -26,40 +24,11 @@ export default function AppHeader() {
   const { range, setRange, resetToToday } = useDateRange();
   const { user, agencyName: contextAgencyName } = useAuth();
 
-  const [userName, setUserName] = useState("");
-  const [storedAgencyName, setStoredAgencyName] = useState("");
-
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const [rawUser, rawAgency] = await Promise.all([
-          AsyncStorage.getItem(AUTH_USER_KEY),
-          AsyncStorage.getItem(AGENCY_NAME_KEY),
-        ]);
-        const parsed = rawUser ? JSON.parse(rawUser) : null;
-        const name = typeof parsed?.name === "string" ? parsed.name.trim() : "";
-        setUserName(name);
-
-        const agency =
-          (typeof rawAgency === "string" && rawAgency.trim()) ||
-          (typeof parsed?.agency_name === "string" && parsed.agency_name.trim()) ||
-          (typeof parsed?.company_name === "string" && parsed.company_name.trim()) ||
-          "";
-        setStoredAgencyName(agency);
-      } catch {
-        setUserName("");
-        setStoredAgencyName("");
-      }
-    };
-
-    loadUserData();
-  }, []);
-
+  const userName = user?.name?.trim();
   const displayAgencyName =
     contextAgencyName?.trim() ||
     user?.agency_name?.trim() ||
-    user?.company_name?.trim() ||
-    storedAgencyName;
+    user?.company_name?.trim();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [pickerTarget, setPickerTarget] = useState<"start" | "end">("start");

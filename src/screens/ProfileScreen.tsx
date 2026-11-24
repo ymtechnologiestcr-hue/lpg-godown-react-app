@@ -28,7 +28,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { showToast } from "../components/common/ToastManager";
 import { useDateRange } from "../context/DateRangeContext";
-import { useNetwork } from "../context/NetworkContext";
+import { useNetworkActions, useNetworkQueue } from "../context/NetworkContext";
 import api from "../services/api";
 
 type DriverProfileDelivery = {
@@ -164,7 +164,8 @@ const getStatusLabel = (status: string) => {
 export default function ProfileScreen({ onRoleChange }: ProfileScreenProps) {
   const { logout } = useAuth();
   const { rangeKey } = useDateRange();
-  const { pendingCount, setOfflineModalOpen } = useNetwork();
+  const { pendingCount } = useNetworkQueue();
+  const { setOfflineModalOpen } = useNetworkActions();
   const [driverId, setDriverId] = useState<number | null>(null);
   const [screenMode, setScreenMode] = useState<"PROFILE" | "BOOKINGS">(
     "PROFILE",

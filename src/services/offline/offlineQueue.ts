@@ -45,6 +45,7 @@ const STORAGE_KEY = "@lpg_driver_offline_actions_v1";
 const DEFAULT_MAX_RETRIES = 5;
 
 type QueueListener = (queue: OfflineAction[]) => void;
+type UpdateActionOptions = { persist?: boolean };
 
 class OfflineQueueManager {
   private inMemoryQueue: OfflineAction[] = [];
@@ -188,6 +189,7 @@ class OfflineQueueManager {
   public async updateAction(
     id: string,
     updates: Partial<OfflineAction>,
+    options: UpdateActionOptions = {},
   ): Promise<void> {
     await this.loadFromStorage();
     const index = this.inMemoryQueue.findIndex((a) => a.id === id);
@@ -196,7 +198,11 @@ class OfflineQueueManager {
         ...this.inMemoryQueue[index],
         ...updates,
       };
-      await this.persist();
+      if (options.persist === false) {
+        this.notifyListeners();
+      } else {
+        await this.persist();
+      }
     }
   }
 

@@ -14,6 +14,8 @@ import {
   subscribeToSessionExpired,
 } from '../services/authSession';
 import { deliveryCache } from '../services/offline/deliveryCache';
+import { getCachedAuthToken, setCachedAuthToken } from '../services/storage/appStorageCache';
+import { clearAppQueryCache } from '../services/queryClient';
 
 interface AuthContextType {
   token: string | null;
@@ -46,12 +48,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuth = async () => {
     try {
       const [storedToken, storedUserText, storedAgency] = await Promise.all([
-        AsyncStorage.getItem(AUTH_TOKEN_KEY),
+        getCachedAuthToken(),
         AsyncStorage.getItem(AUTH_USER_KEY),
         AsyncStorage.getItem(AGENCY_NAME_KEY),
       ]);
 
       if (!storedToken || !storedUserText) {
+        clearAppQueryCache();
+        setCachedAuthToken(storedToken);
         setToken(null);
         setUser(null);
         setRole(null);
@@ -63,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const parsedUser = JSON.parse(storedUserText) as AuthUser;
       if (!parsedUser?.role || !isSupportedMobileRole(parsedUser.role)) {
         await AsyncStorage.multiRemove([AUTH_TOKEN_KEY, AUTH_USER_KEY, APP_ROLE_KEY, AGENCY_NAME_KEY]);
+        clearAppQueryCache();
+        setCachedAuthToken(null);
         setToken(null);
         setUser(null);
         setRole(null);
@@ -103,6 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
       }
     } catch {
+      setCachedAuthToken(null);
       setToken(null);
       setUser(null);
       setRole(null);
@@ -137,7 +144,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       items.push([AGENCY_NAME_KEY, agency]);
     }
 
+    clearAppQueryCache();
     await AsyncStorage.multiSet(items);
+    setCachedAuthToken(newToken);
     markAuthSessionActive();
 
     setToken(newToken);
@@ -158,6 +167,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       AGENCY_NAME_KEY,
       "@lpg_cached_customers_v1",
     ]);
+    clearAppQueryCache();
+    setCachedAuthToken(null);
     setLoginTransitionActive(false);
     setToken(null);
     setUser(null);

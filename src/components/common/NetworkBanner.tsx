@@ -9,20 +9,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { PALETTE, RADIUS } from "../../constants/designSystem";
-import { useNetwork } from "../../context/NetworkContext";
+import {
+  useNetworkActions,
+  useNetworkQueue,
+  useNetworkStatus,
+} from "../../context/NetworkContext";
 
 export default function NetworkBanner() {
   const insets = useSafeAreaInsets();
-  const {
-    status,
-    isOnline,
-    isSlowNetwork,
-    pendingCount,
-    failedCount,
-    isSyncing,
-    setOfflineModalOpen,
-    syncNow,
-  } = useNetwork();
+  const { status, isOnline, isSlowNetwork } = useNetworkStatus();
+  const { pendingCount, failedCount, isSyncing } = useNetworkQueue();
+  const { setOfflineModalOpen, syncNow } = useNetworkActions();
 
   // If completely online with no pending/failed actions and not syncing, hide banner
   if (

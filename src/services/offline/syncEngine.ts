@@ -1,8 +1,7 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { showToast } from "../../components/common/ToastManager";
-import { AUTH_TOKEN_KEY } from "../../constants/auth";
 import api, { API_BASE_URL } from "../api";
 import { networkMonitor } from "../network/networkMonitor";
+import { getCachedAuthToken } from "../storage/appStorageCache";
 import { offlineQueue, OfflineAction } from "./offlineQueue";
 
 export type SyncResult = {
@@ -14,6 +13,7 @@ export type SyncResult = {
 
 type SyncListener = (isSyncing: boolean, lastResult?: SyncResult) => void;
 type RefreshCallback = () => void;
+type ActionExecutionResult = { success: boolean; errorMessage?: string };
 
 class SyncEngine {
   private isSyncing = false;
@@ -130,11 +130,11 @@ class SyncEngine {
         await offlineQueue.updateAction(action.id, {
           status: "SYNCING",
           lastAttemptAt: new Date().toISOString(),
-        });
+        }, { persist: false });
 
-        const success = await this.executeAction(action);
+        const execution = await this.executeAction(action);
 
-        if (success) {
+        if (execution.success) {
           successCount++;
           await offlineQueue.markCompleted(action.id);
         } else {
@@ -145,6 +145,7 @@ class SyncEngine {
           await offlineQueue.updateAction(action.id, {
             status: isMaxExceeded ? "FAILED" : "PENDING",
             retryCount: newRetryCount,
+            errorMessage: execution.errorMessage,
           });
 
           // If failure was due to network disconnection, abort loop
@@ -180,7 +181,7 @@ class SyncEngine {
   /**
    * Execute an individual offline action with proper error inspection & idempotency
    */
-  private async executeAction(action: OfflineAction): Promise<boolean> {
+  private async executeAction(action: OfflineAction): Promise<ActionExecutionResult> {
     try {
       if (action.type === "UPLOAD_FILE" && action.uploadData) {
         return await this.executeFileUpload(action);
@@ -195,9 +196,9 @@ class SyncEngine {
       });
 
       if (response.status >= 200 && response.status < 300) {
-        return true;
+        return { success: true };
       }
-      return false;
+      return { success: false, errorMessage: `Request failed with status ${response.status}` };
     } catch (err: any) {
       console.error(`Sync failed for action [${action.type}] ${action.endpoint}:`, err?.response?.data || err.message);
 
@@ -219,7 +220,7 @@ class SyncEngine {
 
       if (isAlreadyCompleted) {
         console.warn(`Idempotency matched for action ${action.id}: treating as completed`);
-        return true;
+        return { success: true };
       }
 
       // Check if it's a network error/timeout
@@ -233,23 +234,24 @@ class SyncEngine {
         networkMonitor.reportRequestFailure(err);
       }
 
-      await offlineQueue.updateAction(action.id, {
+      return {
+        success: false,
         errorMessage: err?.response?.data?.message || err.message || "Request failed",
-      });
-
-      return false;
+      };
     }
   }
 
   /**
    * Handle multipart file uploads when syncing (e.g. proof of delivery or invoice photo)
    */
-  private async executeFileUpload(action: OfflineAction): Promise<boolean> {
+  private async executeFileUpload(action: OfflineAction): Promise<ActionExecutionResult> {
     const upload = action.uploadData;
-    if (!upload || !upload.fileUri) return false;
+    if (!upload || !upload.fileUri) {
+      return { success: false, errorMessage: "Upload file is missing" };
+    }
 
     try {
-      const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      const token = await getCachedAuthToken();
       const formData = new FormData();
 
       const filename = upload.filename || upload.fileUri.split("/").pop() || "upload.jpg";
@@ -285,13 +287,13 @@ class SyncEngine {
         throw new Error(`Upload failed with status ${res.status}: ${errorText}`);
       }
 
-      return true;
+      return { success: true };
     } catch (e: any) {
       console.error("File upload sync error:", e);
-      await offlineQueue.updateAction(action.id, {
+      return {
+        success: false,
         errorMessage: e.message || "File upload failed",
-      });
-      return false;
+      };
     }
   }
 }

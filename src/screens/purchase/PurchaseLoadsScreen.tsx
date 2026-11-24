@@ -73,13 +73,16 @@ export default function PurchaseLoadsScreen() {
         setLoading(true);
       }
 
-      const bootstrap = await getPurchaseBootstrap();
+      const bootstrap = await getPurchaseBootstrap(withRefresh);
       setUserId(bootstrap.manager.id);
 
       const [loadList, currentTrip, emptyList] = await Promise.all([
-        getPurchaseLoads(bootstrap.manager.id),
-        getActivePurchaseTrip(bootstrap.manager.id),
-        getEmptyCylinderLoads({ purchaseManagerId: bootstrap.manager.id }),
+        getPurchaseLoads(bootstrap.manager.id, withRefresh),
+        getActivePurchaseTrip(bootstrap.manager.id, withRefresh),
+        getEmptyCylinderLoads(
+          { purchaseManagerId: bootstrap.manager.id },
+          withRefresh,
+        ),
       ]);
 
       setLoads(loadList);

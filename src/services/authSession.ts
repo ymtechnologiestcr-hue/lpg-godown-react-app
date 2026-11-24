@@ -5,6 +5,8 @@ import {
   AUTH_USER_KEY,
 } from "../constants/auth";
 import { APP_ROLE_KEY } from "../constants/appRole";
+import { setCachedAuthToken } from "./storage/appStorageCache";
+import { clearAppQueryCache } from "./queryClient";
 
 type SessionExpiredListener = () => void;
 
@@ -32,6 +34,8 @@ export const expireAuthSession = () => {
   if (expirationTask) return expirationTask;
 
   sessionExpired = true;
+  setCachedAuthToken(null);
+  clearAppQueryCache();
   listeners.forEach((listener) => {
     try {
       listener();

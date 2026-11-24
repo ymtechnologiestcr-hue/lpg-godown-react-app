@@ -12,10 +12,20 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DS, PALETTE, RADIUS, TYPO } from "../../constants/designSystem";
-import { useNetwork } from "../../context/NetworkContext";
+import {
+  useNetwork,
+  useNetworkQueue,
+} from "../../context/NetworkContext";
 import { OfflineAction } from "../../services/offline/offlineQueue";
 
 export default function OfflineSyncModal() {
+  const { isOfflineModalOpen } = useNetworkQueue();
+  if (!isOfflineModalOpen) return null;
+
+  return <OfflineSyncModalContent />;
+}
+
+function OfflineSyncModalContent() {
   const {
     status,
     isOnline,
@@ -25,7 +35,6 @@ export default function OfflineSyncModal() {
     pendingCount,
     failedCount,
     isSyncing,
-    isOfflineModalOpen,
     setOfflineModalOpen,
     syncNow,
     retryAction,
@@ -94,7 +103,7 @@ export default function OfflineSyncModal() {
 
   return (
     <Modal
-      visible={isOfflineModalOpen}
+      visible
       animationType="slide"
       transparent={false}
       onRequestClose={() => setOfflineModalOpen(false)}

@@ -41,7 +41,36 @@ interface NetworkContextValue {
   checkConnection: () => Promise<number | null>;
 }
 
+interface NetworkStatusValue {
+  status: NetworkStatus;
+  isOnline: boolean;
+  isSlowNetwork: boolean;
+}
+
+interface NetworkQueueValue {
+  pendingCount: number;
+  failedCount: number;
+  isSyncing: boolean;
+  isOfflineModalOpen: boolean;
+}
+
+interface NetworkActionsValue {
+  setOfflineModalOpen: (open: boolean) => void;
+  syncNow: () => Promise<SyncResult>;
+  retryAction: (id: string) => Promise<SyncResult>;
+  retryAllFailed: () => Promise<SyncResult>;
+  removeAction: (id: string) => Promise<void>;
+  clearCompleted: () => Promise<void>;
+  simulateOffline: (enabled: boolean) => void;
+  simulateSlow: (enabled: boolean) => void;
+  resetSimulation: () => void;
+  checkConnection: () => Promise<number | null>;
+}
+
 const NetworkContext = createContext<NetworkContextValue | null>(null);
+const NetworkStatusContext = createContext<NetworkStatusValue | null>(null);
+const NetworkQueueContext = createContext<NetworkQueueValue | null>(null);
+const NetworkActionsContext = createContext<NetworkActionsValue | null>(null);
 
 export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -136,18 +165,27 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
     return await networkMonitor.measureLatency();
   }, []);
 
-  const value = useMemo(
+  const networkStatus = useMemo(
     () => ({
-      networkState,
       status: networkState.status,
       isOnline: networkState.isOnline,
       isSlowNetwork: networkState.isSlowNetwork,
-      latencyMs: networkState.latencyMs,
-      queue,
+    }),
+    [networkState.status, networkState.isOnline, networkState.isSlowNetwork],
+  );
+
+  const queueState = useMemo(
+    () => ({
       pendingCount,
       failedCount,
       isSyncing,
       isOfflineModalOpen,
+    }),
+    [pendingCount, failedCount, isSyncing, isOfflineModalOpen],
+  );
+
+  const networkActions = useMemo(
+    () => ({
       setOfflineModalOpen,
       syncNow,
       retryAction,
@@ -159,27 +197,29 @@ export const NetworkProvider: React.FC<{ children: React.ReactNode }> = ({
       resetSimulation,
       checkConnection,
     }),
-    [
+    [syncNow, retryAction, retryAllFailed, removeAction, clearCompleted, simulateOffline, simulateSlow, resetSimulation, checkConnection],
+  );
+
+  const value = useMemo(
+    () => ({
       networkState,
+      ...networkStatus,
+      latencyMs: networkState.latencyMs,
       queue,
-      pendingCount,
-      failedCount,
-      isSyncing,
-      isOfflineModalOpen,
-      syncNow,
-      retryAction,
-      retryAllFailed,
-      removeAction,
-      clearCompleted,
-      simulateOffline,
-      simulateSlow,
-      resetSimulation,
-      checkConnection,
-    ],
+      ...queueState,
+      ...networkActions,
+    }),
+    [networkState, networkStatus, queue, queueState, networkActions],
   );
 
   return (
-    <NetworkContext.Provider value={value}>{children}</NetworkContext.Provider>
+    <NetworkStatusContext.Provider value={networkStatus}>
+      <NetworkQueueContext.Provider value={queueState}>
+        <NetworkActionsContext.Provider value={networkActions}>
+          <NetworkContext.Provider value={value}>{children}</NetworkContext.Provider>
+        </NetworkActionsContext.Provider>
+      </NetworkQueueContext.Provider>
+    </NetworkStatusContext.Provider>
   );
 };
 
@@ -188,5 +228,23 @@ export const useNetwork = (): NetworkContextValue => {
   if (!context) {
     throw new Error("useNetwork must be used within a NetworkProvider");
   }
+  return context;
+};
+
+export const useNetworkStatus = (): NetworkStatusValue => {
+  const context = useContext(NetworkStatusContext);
+  if (!context) throw new Error("useNetworkStatus must be used within NetworkProvider");
+  return context;
+};
+
+export const useNetworkQueue = (): NetworkQueueValue => {
+  const context = useContext(NetworkQueueContext);
+  if (!context) throw new Error("useNetworkQueue must be used within NetworkProvider");
+  return context;
+};
+
+export const useNetworkActions = (): NetworkActionsValue => {
+  const context = useContext(NetworkActionsContext);
+  if (!context) throw new Error("useNetworkActions must be used within NetworkProvider");
   return context;
 };

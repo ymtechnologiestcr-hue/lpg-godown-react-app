@@ -1,11 +1,12 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "axios";
 import { showToast } from "../components/common/ToastManager";
-import { AUTH_TOKEN_KEY } from "../constants/auth";
-import { DATE_RANGE_STORAGE_KEY } from "../context/DateRangeContext";
 import { API_BASE_URL } from "./apiConfig";
 import { globalLoader } from "./loader/globalLoaderService";
 import { networkMonitor } from "./network/networkMonitor";
+import {
+  getCachedAuthToken,
+  getCachedDateRange,
+} from "./storage/appStorageCache";
 import {
   expireAuthSession,
   isAuthSessionExpired,
@@ -52,17 +53,16 @@ api.interceptors.request.use(async (config) => {
   }
 
   let token: string | null = null;
-
   try {
-    token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-    // On cold app launches, AsyncStorage might take a few moments to resolve.
+    token = await getCachedAuthToken();
+    // On cold app launches, the shared token cache may still be initializing.
     // Retry up to 2 times (total ~300ms) before giving up and canceling.
     if (!token && !isAuthSessionExpired() && !url.includes("/auth/")) {
       await new Promise((r) => setTimeout(r, 120));
-      token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+      token = await getCachedAuthToken();
       if (!token) {
         await new Promise((r) => setTimeout(r, 180));
-        token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+        token = await getCachedAuthToken();
       }
     }
   } catch (error) {
@@ -94,27 +94,13 @@ api.interceptors.request.use(async (config) => {
   }
 
   try {
-    const raw = await AsyncStorage.getItem(DATE_RANGE_STORAGE_KEY);
-
-    if (!raw) {
-      return config;
-    }
-
-    const parsed = JSON.parse(raw || "{}");
-    const startDate = String(parsed?.startDate || "");
-    const endDate = String(parsed?.endDate || "");
-
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(endDate)
-    ) {
-      return config;
-    }
+    const dateRange = await getCachedDateRange();
+    if (!dateRange) return config;
 
     config.params = {
       ...(config.params || {}),
-      startDate,
-      endDate,
+      startDate: dateRange.startDate,
+      endDate: dateRange.endDate,
     };
   } catch {
     // keep request unchanged if storage read fails

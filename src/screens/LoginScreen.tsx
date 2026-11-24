@@ -1,9 +1,9 @@
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ScrollView,
   StatusBar,
@@ -38,6 +38,20 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [masked, setMasked] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [identifierFocused, setIdentifierFocused] = useState(false);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSubscription = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const handleChangeEmail = () => {
     setPassword('');
@@ -112,12 +126,11 @@ export default function LoginScreen() {
     <AuthBackdrop>
       <StatusBar barStyle="dark-content" backgroundColor={AUTH_COLORS.background} />
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView
-          style={styles.keyboardArea}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        >
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
+        <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              keyboardVisible && styles.scrollContentWithKeyboard,
+            ]}
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.brandHeader}>
@@ -139,7 +152,7 @@ export default function LoginScreen() {
 
               <Text style={styles.label}>Email or phone</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, identifierFocused && styles.inputFocused]}
                 value={identifier}
                 onChangeText={setIdentifier}
                 editable={step === 'IDENTIFIER'}
@@ -149,6 +162,8 @@ export default function LoginScreen() {
                 autoCorrect={false}
                 keyboardType="email-address"
                 returnKeyType={step === 'IDENTIFIER' ? 'go' : 'next'}
+                onFocus={() => setIdentifierFocused(true)}
+                onBlur={() => setIdentifierFocused(false)}
                 onSubmitEditing={step === 'IDENTIFIER' ? handleIdentify : undefined}
               />
 
@@ -224,8 +239,7 @@ export default function LoginScreen() {
                 </>
               )}
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+        </ScrollView>
       </SafeAreaView>
     </AuthBackdrop>
   );
@@ -236,13 +250,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  keyboardArea: {
-    flex: 1,
-  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingVertical: 28,
+  },
+  scrollContentWithKeyboard: {
+    justifyContent: 'flex-start',
+    paddingTop: 12,
+    paddingBottom: 20,
   },
   brandHeader: {
     flexDirection: 'row',
@@ -309,16 +325,20 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
   input: {
-    height: 50,
+    height: 56,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: AUTH_COLORS.border,
-    backgroundColor: AUTH_COLORS.input,
+    borderWidth: 2,
+    borderColor: AUTH_COLORS.secondary,
+    backgroundColor: AUTH_COLORS.white,
     paddingHorizontal: 14,
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     color: AUTH_COLORS.text,
     marginBottom: 15,
+  },
+  inputFocused: {
+    borderColor: AUTH_COLORS.brandRed,
+    backgroundColor: AUTH_COLORS.white,
   },
   accountRow: {
     flexDirection: 'row',

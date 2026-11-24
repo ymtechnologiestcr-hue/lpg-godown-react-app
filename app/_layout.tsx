@@ -1,5 +1,13 @@
 import { Redirect, Stack, useSegments } from "expo-router";
-import { ActivityIndicator, View } from "react-native";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { useEffect } from "react";
+import {
+  ActivityIndicator,
+  DeviceEventEmitter,
+  KeyboardAvoidingView,
+  Platform,
+  View,
+} from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import GlobalLoader from "../src/components/common/GlobalLoader";
@@ -12,6 +20,39 @@ import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { DateRangeProvider } from "../src/context/DateRangeContext";
 import { GlobalLoaderProvider } from "../src/context/GlobalLoaderContext";
 import { NetworkProvider } from "../src/context/NetworkContext";
+import { queryClient } from "../src/services/queryClient";
+
+function QueryInvalidationListener() {
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(
+      "PURCHASE_FLOW_UPDATED",
+      () => {
+        void queryClient.invalidateQueries({ queryKey: ["purchase"] });
+        void queryClient.invalidateQueries({
+          queryKey: ["empty-cylinder-loads"],
+        });
+        void queryClient.invalidateQueries({
+          queryKey: ["purchase-managers"],
+        });
+      },
+    );
+
+    return () => subscription.remove();
+  }, []);
+
+  return null;
+}
+
+function KeyboardAwareStack() {
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <Stack screenOptions={{ headerShown: false, animation: "fade_from_bottom" }} />
+    </KeyboardAvoidingView>
+  );
+}
 
 function RootNavigation() {
   const segments = useSegments();
@@ -56,7 +97,7 @@ function RootNavigation() {
     return (
       <>
         <GlobalLoader />
-        <Stack screenOptions={{ headerShown: false, animation: "fade_from_bottom" }} />
+        <KeyboardAwareStack />
         <ToastManager />
       </>
     );
@@ -76,7 +117,7 @@ function RootNavigation() {
     <>
       <GlobalLoader />
       <NetworkBanner />
-      <Stack screenOptions={{ headerShown: false, animation: "fade_from_bottom" }} />
+      <KeyboardAwareStack />
       <ToastManager />
       <OfflineSyncModal />
     </>
@@ -85,17 +126,20 @@ function RootNavigation() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <GlobalLoaderProvider>
-        <AuthProvider>
-          <DateRangeProvider>
-            <NetworkProvider>
-              <RootNavigation />
-            </NetworkProvider>
-          </DateRangeProvider>
-        </AuthProvider>
-      </GlobalLoaderProvider>
-    </SafeAreaProvider>
+    <QueryClientProvider client={queryClient}>
+      <QueryInvalidationListener />
+      <SafeAreaProvider>
+        <GlobalLoaderProvider>
+          <AuthProvider>
+            <DateRangeProvider>
+              <NetworkProvider>
+                <RootNavigation />
+              </NetworkProvider>
+            </DateRangeProvider>
+          </AuthProvider>
+        </GlobalLoaderProvider>
+      </SafeAreaProvider>
+    </QueryClientProvider>
   );
 }
 

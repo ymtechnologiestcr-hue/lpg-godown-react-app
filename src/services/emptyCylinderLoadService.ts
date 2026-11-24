@@ -1,18 +1,18 @@
 import axios from 'axios';
 
 import api, { API_BASE_URL } from './api';
+import { fetchCachedQuery } from './queryClient';
 import type {
   EmptyCylinderLoad,
   EmptyCylinderLoadDetail,
   PurchaseManagerOption,
 } from '../types';
 
-import { AUTH_TOKEN_KEY } from '../constants/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCachedAuthToken } from './storage/appStorageCache';
 
 // Reliable fetch wrapper for FormData uploads on React Native to bypass Axios bugs.
 const fetchUpload = async (url: string, formData: FormData) => {
-  const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+  const token = await getCachedAuthToken();
   const res = await fetch(`${API_BASE_URL}${url}`, {
     method: "POST",
     headers: {
@@ -45,12 +45,21 @@ export const uploadEmptyLoadInvoice = async (localUri: string): Promise<string> 
   return res.url;
 };
 
-export const getPurchaseManagers = async (): Promise<PurchaseManagerOption[]> => {
-  const res = await api.get<{ success: boolean; data: PurchaseManagerOption[] }>(
-    '/empty-cylinder-loads/purchase-managers'
+export const getPurchaseManagers = (
+  forceRefresh = false,
+): Promise<PurchaseManagerOption[]> =>
+  fetchCachedQuery(
+    ["purchase-managers"],
+    async () => {
+      const res = await api.get<{
+        success: boolean;
+        data: PurchaseManagerOption[];
+      }>("/empty-cylinder-loads/purchase-managers");
+      return res.data.data ?? [];
+    },
+    60_000,
+    forceRefresh,
   );
-  return res.data.data ?? [];
-};
 
 export const createEmptyCylinderLoad = async (payload: {
   assigned_by?: number | null;
@@ -66,22 +75,36 @@ export const createEmptyCylinderLoad = async (payload: {
 export const getEmptyCylinderLoads = async (params?: {
   purchaseManagerId?: number;
   status?: string;
-}): Promise<EmptyCylinderLoad[]> => {
-  const res = await api.get<{ success: boolean; data: EmptyCylinderLoad[] }>(
-    '/empty-cylinder-loads',
-    { params }
+}, forceRefresh = false): Promise<EmptyCylinderLoad[]> =>
+  fetchCachedQuery(
+    ["empty-cylinder-loads", params ?? {}],
+    async () => {
+      const res = await api.get<{
+        success: boolean;
+        data: EmptyCylinderLoad[];
+      }>("/empty-cylinder-loads", { params });
+      return res.data.data ?? [];
+    },
+    30_000,
+    forceRefresh,
   );
-  return res.data.data ?? [];
-};
 
-export const getEmptyCylinderLoadDetail = async (
-  loadId: string | number
-): Promise<EmptyCylinderLoadDetail> => {
-  const res = await api.get<{ success: boolean; data: EmptyCylinderLoadDetail }>(
-    `/empty-cylinder-loads/${loadId}`
+export const getEmptyCylinderLoadDetail = (
+  loadId: string | number,
+  forceRefresh = false,
+): Promise<EmptyCylinderLoadDetail> =>
+  fetchCachedQuery(
+    ["empty-cylinder-loads", "detail", loadId],
+    async () => {
+      const res = await api.get<{
+        success: boolean;
+        data: EmptyCylinderLoadDetail;
+      }>(`/empty-cylinder-loads/${loadId}`);
+      return res.data.data;
+    },
+    30_000,
+    forceRefresh,
   );
-  return res.data.data;
-};
 
 export const acceptEmptyCylinderLoad = async (loadId: string | number) => {
   const res = await api.put(`/empty-cylinder-loads/${loadId}/accept`);

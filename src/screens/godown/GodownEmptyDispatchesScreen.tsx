@@ -71,7 +71,7 @@ export default function GodownEmptyDispatchesScreen() {
       }
 
       // No purchaseManagerId filter — the godown sees every dispatch it made.
-      const data = await getEmptyCylinderLoads();
+      const data = await getEmptyCylinderLoads(undefined, withRefresh);
       setLoads(data);
     } catch (error) {
       console.log('Empty dispatches error:', error);

@@ -1,7 +1,10 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  getCachedDateRange,
+  setCachedDateRange,
+} from '../services/storage/appStorageCache';
 
-export const DATE_RANGE_STORAGE_KEY = 'global_date_range';
+export { DATE_RANGE_STORAGE_KEY } from '../services/storage/appStorageCache';
 
 export type GlobalDateRange = {
   startDate: string;
@@ -44,25 +47,8 @@ export function DateRangeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const load = async () => {
       try {
-        const raw = await AsyncStorage.getItem(DATE_RANGE_STORAGE_KEY);
-
-        if (!raw) {
-          return;
-        }
-
-        const parsed = JSON.parse(raw);
-        const startDate = toValidIso(parsed?.startDate);
-        const endDate = toValidIso(parsed?.endDate);
-
-        if (!startDate || !endDate) {
-          return;
-        }
-
-        setRangeState(
-          startDate <= endDate
-            ? { startDate, endDate }
-            : { startDate: endDate, endDate: startDate }
-        );
+        const storedRange = await getCachedDateRange();
+        if (storedRange) setRangeState(storedRange);
       } catch {
         // ignore and keep default
       }
@@ -87,10 +73,7 @@ export function DateRangeProvider({ children }: { children: ReactNode }) {
     setRangeState(normalized);
 
     try {
-      await AsyncStorage.setItem(
-        DATE_RANGE_STORAGE_KEY,
-        JSON.stringify(normalized)
-      );
+      await setCachedDateRange(normalized);
     } catch {
       // ignore persistence failure
     }

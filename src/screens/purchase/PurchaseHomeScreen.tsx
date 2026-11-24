@@ -52,8 +52,11 @@ export default function PurchaseHomeScreen() {
         setLoading(true);
       }
 
-      const bootstrapData = await getPurchaseBootstrap();
-      const dashboardData = await getPurchaseDashboard(bootstrapData.manager.id);
+      const bootstrapData = await getPurchaseBootstrap(withRefresh);
+      const dashboardData = await getPurchaseDashboard(
+        bootstrapData.manager.id,
+        withRefresh,
+      );
 
       setBootstrap(bootstrapData);
       setDashboard(dashboardData);

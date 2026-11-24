@@ -200,14 +200,14 @@ export default function PurchaseLoadDetailScreen() {
         setLoading(true);
       }
 
-      const firstLoad = await getPurchaseLoadDetail(id);
+      const firstLoad = await getPurchaseLoadDetail(id, withRefresh);
       const currentTripId = firstLoad.tripId;
 
-      const bootstrap = await getPurchaseBootstrap();
+      const bootstrap = await getPurchaseBootstrap(withRefresh);
 
       const [loadList, activeTrip] = await Promise.all([
-        getPurchaseLoads(bootstrap.manager.id),
-        getActivePurchaseTrip(bootstrap.manager.id),
+        getPurchaseLoads(bootstrap.manager.id, withRefresh),
+        getActivePurchaseTrip(bootstrap.manager.id, withRefresh),
       ]);
 
       const tripLoadSummaries = loadList
@@ -217,7 +217,7 @@ export default function PurchaseLoadDetailScreen() {
       const tripLoads = await Promise.all(
         tripLoadSummaries.map(async (item) => {
           try {
-            return await getPurchaseLoadDetail(item.id);
+            return await getPurchaseLoadDetail(item.id, withRefresh);
           } catch {
             return item;
           }

@@ -2,6 +2,7 @@ import NetInfo, {
   NetInfoState,
   NetInfoStateType,
 } from "@react-native-community/netinfo";
+import { AppState } from "react-native";
 import { API_SERVER_ROOT } from "../apiConfig";
 
 export type NetworkStatus = "ONLINE" | "SLOW" | "OFFLINE";
@@ -22,6 +23,7 @@ export interface NetworkQualityState {
 const SLOW_LATENCY_THRESHOLD_MS = 2500;
 const PING_TIMEOUT_MS = 3500;
 const PERIODIC_PING_INTERVAL_MS = 25000;
+const SLOW_CONFIRMATION_DELAY_MS = 800;
 
 type StateListener = (state: NetworkQualityState) => void;
 
@@ -41,7 +43,13 @@ class NetworkMonitor {
   private listeners: Set<StateListener> = new Set();
   private unsubscribeNetInfo: (() => void) | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private confirmationTimer: ReturnType<typeof setTimeout> | null = null;
   private isPinging = false;
+  private connectionEpoch = 0;
+  private lastConnectionKey: string | null = null;
+  private lastNativeConnectivity: { connected: boolean; reachable: boolean } | null = null;
+  private consecutiveSlowProbes = 0;
+  private consecutiveFastProbes = 0;
 
   constructor() {
     this.init();
@@ -54,10 +62,14 @@ class NetworkMonitor {
     });
 
     // 2. Fetch initial state
-    NetInfo.fetch().then((netState) => {
-      this.handleNetInfoChange(netState);
-      this.measureLatency();
-    });
+    NetInfo.fetch()
+      .then((netState) => {
+        this.handleNetInfoChange(netState);
+        this.measureLatency();
+      })
+      .catch(() => {
+        // The event listener remains active if the initial fetch is unavailable.
+      });
 
     // 3. Periodic ping to actively measure latency & packet loss
     this.startPeriodicPing();
@@ -68,7 +80,11 @@ class NetworkMonitor {
       clearInterval(this.pingTimer);
     }
     this.pingTimer = setInterval(() => {
-      if (this.currentState.isOnline && !this.currentState.isSimulatedOffline) {
+      if (
+        AppState.currentState === "active" &&
+        this.currentState.isOnline &&
+        !this.currentState.isSimulatedOffline
+      ) {
         this.measureLatency();
       }
     }, PERIODIC_PING_INTERVAL_MS);
@@ -78,7 +94,7 @@ class NetworkMonitor {
     const isConnected = Boolean(netState.isConnected);
     // On some devices isInternetReachable may initially be null; treat null as isConnected
     const isReachable =
-      netState.isInternetReachable !== null
+      netState.isInternetReachable != null
         ? Boolean(netState.isInternetReachable)
         : isConnected;
 
@@ -89,28 +105,48 @@ class NetworkMonitor {
         ? (netState.details as any).cellularGeneration
         : null;
 
-    // 2G or weak cellular generation is inherently slow
-    const is2GOrSlowCellular =
-      cellularGen === "2g" || cellularGen === "3g";
+    const connectionDetails = netState.details as any;
+    const connectionKey = [
+      netState.type,
+      cellularGen ?? "",
+      connectionDetails?.ssid ?? "",
+      connectionDetails?.bssid ?? "",
+      connectionDetails?.ipAddress ?? "",
+    ].join(":");
+    const connectivityChanged =
+      this.lastConnectionKey !== connectionKey ||
+      this.lastNativeConnectivity?.connected !== isConnected ||
+      this.lastNativeConnectivity?.reachable !== isReachable;
 
-    let calculatedStatus: NetworkStatus = "ONLINE";
-    if (!isConnected || !isReachable) {
-      calculatedStatus = "OFFLINE";
-    } else if (is2GOrSlowCellular) {
-      calculatedStatus = "SLOW";
-    } else if (
-      this.currentState.latencyMs !== null &&
-      this.currentState.latencyMs > SLOW_LATENCY_THRESHOLD_MS
-    ) {
-      calculatedStatus = "SLOW";
+    if (connectivityChanged) {
+      this.connectionEpoch += 1;
+      this.consecutiveSlowProbes = 0;
+      this.consecutiveFastProbes = 0;
+      if (this.confirmationTimer) {
+        clearTimeout(this.confirmationTimer);
+        this.confirmationTimer = null;
+      }
     }
+
+    this.lastConnectionKey = connectionKey;
+    this.lastNativeConnectivity = { connected: isConnected, reachable: isReachable };
+
+    const isOffline = !isConnected || !isReachable;
+    const nextStatus: NetworkStatus = isOffline
+      ? "OFFLINE"
+      : connectivityChanged
+        ? "ONLINE"
+        : this.currentState.isSlowNetwork
+          ? "SLOW"
+          : "ONLINE";
 
     this.updateState({
       connectionType: netState.type,
       cellularGeneration: cellularGen,
-      isOnline: calculatedStatus !== "OFFLINE",
-      isSlowNetwork: calculatedStatus === "SLOW",
-      status: calculatedStatus,
+      ...(connectivityChanged ? { latencyMs: null } : {}),
+      isOnline: !isOffline,
+      isSlowNetwork: nextStatus === "SLOW",
+      status: nextStatus,
       lastCheckedAt: Date.now(),
     });
 
@@ -146,8 +182,21 @@ class NetworkMonitor {
       return 3200;
     }
 
+    if (this.confirmationTimer) {
+      clearTimeout(this.confirmationTimer);
+      this.confirmationTimer = null;
+    }
+
+    // NetInfo is the authority for reachability. Avoid turning a health-check
+    // failure into an offline state when the device still has internet access.
+    if (!this.currentState.isOnline) {
+      return null;
+    }
+
     this.isPinging = true;
     const startTime = Date.now();
+    const requestEpoch = this.connectionEpoch;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     // Probe the public backend health check (/api/health);
     // /auth/identify is an account lookup endpoint that requires auth parameters.
@@ -155,61 +204,97 @@ class NetworkMonitor {
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
+      timeoutId = setTimeout(() => {
         controller.abort();
       }, PING_TIMEOUT_MS);
 
       // The server root responds to GET; HEAD may return a misleading 404.
-      await fetch(pingUrl, {
+      const response = await fetch(pingUrl, {
         method: "GET",
         signal: controller.signal,
         cache: "no-store",
       });
 
-      clearTimeout(timeoutId);
-
       const latency = Date.now() - startTime;
-      const isSlow = latency > SLOW_LATENCY_THRESHOLD_MS;
+      if (!response.ok) {
+        // A backend health error is a server problem, not evidence of a weak link.
+        this.consecutiveSlowProbes = 0;
+        this.consecutiveFastProbes = 0;
+        if (requestEpoch === this.connectionEpoch && this.currentState.isOnline) {
+          this.updateState({
+            latencyMs: null,
+            isSlowNetwork: false,
+            status: "ONLINE",
+            lastCheckedAt: Date.now(),
+          });
+        }
+        return null;
+      }
 
-      this.updateState({
-        latencyMs: latency,
-        isOnline: true,
-        isSlowNetwork: isSlow,
-        status: isSlow ? "SLOW" : "ONLINE",
-        lastCheckedAt: Date.now(),
-      });
+      this.applyLatencySample(latency, requestEpoch);
 
       return latency;
     } catch (err: any) {
       // AbortController timeout or network error indicates offline or extremely slow
       const isTimeout =
         err?.name === "AbortError" ||
-        err?.message?.includes("aborted") ||
-        err?.message?.includes("timeout");
+        /abort|timed? ?out|timeout/i.test(String(err?.message || ""));
 
-      if (isTimeout) {
-        // Request timed out (> 3500ms): Treat as SLOW network (or near dead)
-        this.updateState({
-          latencyMs: PING_TIMEOUT_MS,
-          isOnline: true,
-          isSlowNetwork: true,
-          status: "SLOW",
-          lastCheckedAt: Date.now(),
-        });
+      if (isTimeout && requestEpoch === this.connectionEpoch) {
+        // A single delayed probe may be a server hiccup. Require confirmation.
+        this.applyLatencySample(PING_TIMEOUT_MS, requestEpoch);
         return PING_TIMEOUT_MS;
       }
 
-      // Complete fetch failure: might be totally offline
-      this.updateState({
-        latencyMs: null,
-        isOnline: false,
-        isSlowNetwork: false,
-        status: "OFFLINE",
-        lastCheckedAt: Date.now(),
-      });
+      // A failed health endpoint is not proof that the device lost internet.
       return null;
     } finally {
+      if (timeoutId) clearTimeout(timeoutId);
       this.isPinging = false;
+      if (requestEpoch !== this.connectionEpoch && this.currentState.isOnline) {
+        setTimeout(() => {
+          if (AppState.currentState === "active") this.measureLatency();
+        }, 0);
+      }
+    }
+  }
+
+  private applyLatencySample(latencyMs: number, requestEpoch: number) {
+    if (requestEpoch !== this.connectionEpoch || !this.currentState.isOnline) {
+      return;
+    }
+
+    const isSlowSample = latencyMs > SLOW_LATENCY_THRESHOLD_MS;
+    if (isSlowSample) {
+      this.consecutiveSlowProbes += 1;
+      this.consecutiveFastProbes = 0;
+    } else {
+      this.consecutiveFastProbes += 1;
+      this.consecutiveSlowProbes = 0;
+    }
+
+    const isConfirmedSlow = isSlowSample
+      ? this.currentState.isSlowNetwork || this.consecutiveSlowProbes >= 2
+      : this.currentState.isSlowNetwork && this.consecutiveFastProbes < 2;
+
+    this.updateState({
+      latencyMs,
+      isOnline: true,
+      isSlowNetwork: isConfirmedSlow,
+      status: isConfirmedSlow ? "SLOW" : "ONLINE",
+      lastCheckedAt: Date.now(),
+    });
+
+    if (
+      isSlowSample &&
+      !isConfirmedSlow &&
+      !this.confirmationTimer &&
+      this.currentState.isOnline
+    ) {
+      this.confirmationTimer = setTimeout(() => {
+        this.confirmationTimer = null;
+        this.measureLatency();
+      }, SLOW_CONFIRMATION_DELAY_MS);
     }
   }
 
@@ -220,10 +305,11 @@ class NetworkMonitor {
    * every failed business request as a poor network.
    */
   public reportRequestFailure(error: any) {
+    const message = String(error?.message || "");
     const isNetworkError =
       error?.code === "ECONNABORTED" ||
-      error?.message?.toLowerCase().includes("network error") ||
-      error?.message?.toLowerCase().includes("timeout");
+      error?.code === "ETIMEDOUT" ||
+      /network error|timed? ?out|timeout/i.test(message);
 
     if (isNetworkError) {
       // The ping will set ONLINE, SLOW, or OFFLINE based on actual reachability.
@@ -232,14 +318,24 @@ class NetworkMonitor {
   }
 
   public reportRequestSuccess(durationMs?: number) {
-    // Endpoint duration includes server work (DB transactions, OTP/payment
-    // processing, etc.), so it is not a reliable measure of network quality.
-    // A quick successful request can confirm recovery; slow status comes from
-    // the dedicated health ping instead.
-    if (this.currentState.status === "SLOW" && durationMs && durationMs < 1000) {
+    // A successful round trip under one second is strong evidence that the
+    // connection has recovered; slower business requests may include server work.
+    if (
+      this.currentState.isSlowNetwork &&
+      durationMs !== undefined &&
+      durationMs < 1000
+    ) {
+      this.consecutiveSlowProbes = 0;
+      this.consecutiveFastProbes = 2;
+      if (this.confirmationTimer) {
+        clearTimeout(this.confirmationTimer);
+        this.confirmationTimer = null;
+      }
       this.updateState({
+        isOnline: true,
         isSlowNetwork: false,
         status: "ONLINE",
+        latencyMs: durationMs,
         lastCheckedAt: Date.now(),
       });
     }
@@ -279,7 +375,9 @@ class NetworkMonitor {
       this.currentState.status !== nextState.status ||
       this.currentState.isOnline !== nextState.isOnline ||
       this.currentState.isSlowNetwork !== nextState.isSlowNetwork ||
-      this.currentState.latencyMs !== nextState.latencyMs;
+      this.currentState.latencyMs !== nextState.latencyMs ||
+      this.currentState.connectionType !== nextState.connectionType ||
+      this.currentState.cellularGeneration !== nextState.cellularGeneration;
 
     this.currentState = nextState;
 
@@ -302,25 +400,64 @@ class NetworkMonitor {
    * Simulation tools for testing in development or demonstration
    */
   public simulateOffline(enabled: boolean) {
-    this.updateState({
-      isSimulatedOffline: enabled,
-      isSimulatedSlow: false,
-    });
+    if (enabled) {
+      this.updateState({
+        isSimulatedOffline: true,
+        isSimulatedSlow: false,
+      });
+      return;
+    }
+
+    this.restoreNativeNetworkState();
   }
 
   public simulateSlowNetwork(enabled: boolean) {
-    this.updateState({
-      isSimulatedSlow: enabled,
-      isSimulatedOffline: false,
-    });
+    if (enabled) {
+      this.updateState({
+        isSimulatedSlow: true,
+        isSimulatedOffline: false,
+      });
+      return;
+    }
+
+    this.restoreNativeNetworkState();
   }
 
   public resetSimulation() {
+    this.restoreNativeNetworkState();
+  }
+
+  private restoreNativeNetworkState() {
+    this.connectionEpoch += 1;
+    this.consecutiveSlowProbes = 0;
+    this.consecutiveFastProbes = 0;
+    if (this.confirmationTimer) {
+      clearTimeout(this.confirmationTimer);
+      this.confirmationTimer = null;
+    }
+
+    const isOnline = Boolean(
+      this.lastNativeConnectivity?.connected &&
+        this.lastNativeConnectivity.reachable,
+    );
     this.updateState({
       isSimulatedOffline: false,
       isSimulatedSlow: false,
+      isOnline,
+      isSlowNetwork: false,
+      status: isOnline ? "ONLINE" : "OFFLINE",
+      latencyMs: null,
+      lastCheckedAt: Date.now(),
     });
-    this.measureLatency();
+
+    NetInfo.fetch()
+      .then((netState) => {
+        this.handleNetInfoChange(netState);
+        if (this.currentState.isOnline) this.measureLatency();
+      })
+      .catch(() => {
+        // Keep the last native reachability result if a refresh is unavailable.
+      });
   }
 
   public destroy() {
@@ -329,6 +466,9 @@ class NetworkMonitor {
     }
     if (this.pingTimer) {
       clearInterval(this.pingTimer);
+    }
+    if (this.confirmationTimer) {
+      clearTimeout(this.confirmationTimer);
     }
     this.listeners.clear();
   }
